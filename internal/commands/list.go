@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
@@ -55,36 +56,38 @@ func NewListCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "", fmt.Sprintf("output path for the image list"))
+	cmd.Flags().StringP("output", "o", "", "output path for the image list")
 
 	return &cmd
 }
 
-func runListCommand(args []string) error {
-	workingDir, err := os.Getwd()
+// GetImagesFromFile reads in a text file of images and returns
+// them as DockerImage types
+func GetImagesFromFile(filePath string) ([]DockerImage, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
+		return nil, fmt.Errorf("opening file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var images []string
+	for scanner.Scan() {
+		images = append(images, scanner.Text())
 	}
 
-	listPath := filepath.Join(workingDir, args[0])
-	images, err := GetImagesInPath(listPath)
-	if err != nil {
-		return fmt.Errorf("get images from path: %w", err)
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning file: %w", err)
 	}
 
-	if viper.GetString("output") != "" {
-		outputFile := filepath.Join(workingDir, viper.GetString("output"))
-		writeListToFile(images, outputFile)
-	} else {
-		for _, image := range images {
-			fmt.Println(image)
-		}
-	}
+	marshaledImages := marshalImages(images)
 
-	return nil
+	return marshaledImages, nil
 }
 
-func GetImagesInPath(path string) ([]DockerImage, error) {
+// GetImagesFromYaml finds all yaml files in a given path and returns
+// all of the images found in the manifests
+func GetImagesFromYaml(path string) ([]DockerImage, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -95,18 +98,8 @@ func GetImagesInPath(path string) ([]DockerImage, error) {
 		return nil, fmt.Errorf("split yaml files: %w", err)
 	}
 
-	type BaseSpec struct {
-		Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
-	}
-
-	type BaseType struct {
-		Spec BaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	}
-
 	var imageList []string
 	for _, yamlFile := range yamlFiles {
-		var contents BaseType
-
 		var typeMeta metav1.TypeMeta
 		if err := yaml.Unmarshal(yamlFile, &typeMeta); err != nil {
 			continue
@@ -134,24 +127,82 @@ func GetImagesInPath(path string) ([]DockerImage, error) {
 			continue
 		}
 
+		type BaseSpec struct {
+			Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
+		}
+
+		type BaseType struct {
+			Spec BaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+		}
+
+		var contents BaseType
 		if err := yaml.Unmarshal(yamlFile, &contents); err != nil {
 			continue
 		}
 
-		if len(contents.Spec.Template.Spec.InitContainers) > 0 {
-			imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.InitContainers)...)
-		}
-
-		if len(contents.Spec.Template.Spec.Containers) > 0 {
-			imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
-		}
+		imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.InitContainers)...)
+		imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
 	}
 
 	dedupedImageList := dedupeImages(imageList)
-
 	marshaledImages := marshalImages(dedupedImageList)
 
 	return marshaledImages, nil
+}
+
+func runListCommand(args []string) error {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working dir: %w", err)
+	}
+
+	listPath := filepath.Join(workingDir, args[0])
+	images, err := GetImagesFromYaml(listPath)
+	if err != nil {
+		return fmt.Errorf("get images from path: %w", err)
+	}
+
+	if viper.GetString("output") != "" {
+		outputFile := filepath.Join(workingDir, viper.GetString("output"))
+		if err := writeListToFile(images, outputFile); err != nil {
+			return fmt.Errorf("writing list to file: %w", err)
+		}
+	} else {
+		for _, image := range images {
+			fmt.Println(image)
+		}
+	}
+
+	return nil
+}
+
+func getOriginalImage(dockerImage DockerImage, mirrorPrefix string) DockerImage {
+	quayMappings := []string{
+		"kubernetes-ingress-controller",
+		"coreos",
+	}
+
+	originalHost := "docker.io"
+	for _, quayMapping := range quayMappings {
+		if strings.Contains(dockerImage.Repository, quayMapping) {
+			originalHost = "quay.io"
+		}
+	}
+
+	var originalRepository string
+	if strings.Contains(mirrorPrefix, "/") {
+		mirrorRepository := strings.SplitN(mirrorPrefix, "/", 2)[1]
+		originalRepository = strings.Replace(dockerImage.Repository, mirrorRepository+"/", "", 1)
+	}
+
+	originalImage := DockerImage{
+		Host:       originalHost,
+		Repository: originalRepository,
+		Name:       dockerImage.Name,
+		Version:    dockerImage.Version,
+	}
+
+	return originalImage
 }
 
 func marshalImages(images []string) []DockerImage {
@@ -196,7 +247,9 @@ func writeListToFile(images []DockerImage, outputFile string) error {
 	defer f.Close()
 
 	for _, value := range images {
-		fmt.Fprintln(f, value)
+		if _, err := fmt.Fprintln(f, value); err != nil {
+			return fmt.Errorf("writing image to file: %w", err)
+		}
 	}
 
 	return nil
@@ -207,23 +260,14 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 	for _, container := range containers {
 		images = append(images, container.Image)
 
-		argImages := getImagesFromContainerArgs(container.Args)
+		for _, arg := range container.Args {
+			if !strings.Contains(arg, ":") || strings.Contains(arg, "=:") {
+				continue
+			}
 
-		images = append(images, argImages...)
-	}
-
-	return images
-}
-
-func getImagesFromContainerArgs(args []string) []string {
-	var images []string
-	for _, arg := range args {
-		if !strings.Contains(arg, ":") || strings.Contains(arg, "=:") {
-			continue
+			argTokens := strings.Split(arg, "=")
+			images = append(images, argTokens[1])
 		}
-
-		argTokens := strings.Split(arg, "=")
-		images = append(images, argTokens[1])
 	}
 
 	return images
@@ -269,9 +313,7 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 
 		individualYamlFiles := doSplit(fileContent)
 
-		for _, yamlFile := range individualYamlFiles {
-			yamlFiles = append(yamlFiles, yamlFile)
-		}
+		yamlFiles = append(yamlFiles, individualYamlFiles...)
 	}
 
 	return yamlFiles, nil

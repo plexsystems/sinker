@@ -4,11 +4,9 @@ go 1.14
 
 require (
 	cuelang.org/go v0.1.2
-	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Microsoft/hcsshim v0.8.9 // indirect
-	github.com/containerd/containerd v1.3.2
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
-	github.com/coreos/prometheus-operator v0.38.1
+	github.com/coreos/prometheus-operator v0.39.0
 	github.com/docker/cli v0.0.0-20200130152716-5d0cf8839492
 	github.com/docker/distribution v0.0.0-20191008191456-ae2e973db936 // indirect
 	github.com/docker/docker v0.7.3-0.20190826074503-38ab9da00309

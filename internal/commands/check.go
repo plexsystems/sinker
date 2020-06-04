@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/heroku/docker-registry-client/registry"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // NewCheckCommand creates a new list command
@@ -17,9 +18,12 @@ func NewCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the remote registry",
-		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
+				return fmt.Errorf("bind flag: %w", err)
+			}
+
 			if err := runCheckCommand(args); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
@@ -27,6 +31,8 @@ func NewCheckCommand() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
 
 	return &cmd
 }
@@ -37,11 +43,17 @@ func runCheckCommand(args []string) error {
 		return fmt.Errorf("get working dir: %w", err)
 	}
 
-	sourcePath := filepath.Join(workingDir, args[0])
+	imageListPath := filepath.Join(workingDir, args[0])
 
-	sourceImages, err := GetImagesInPath(sourcePath)
+	mirrorImages, err := GetImagesFromFile(imageListPath)
 	if err != nil {
-		return fmt.Errorf("get before list: %w", err)
+		return fmt.Errorf("get images from file: %w", err)
+	}
+
+	var originalImages []DockerImage
+	for _, mirrorImage := range mirrorImages {
+		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
+		originalImages = append(originalImages, originalImage)
 	}
 
 	api, err := registry.New("https://registry-1.docker.io/", "", "")
@@ -50,25 +62,25 @@ func runCheckCommand(args []string) error {
 	}
 	api.Logf = registry.Quiet
 
-	for _, sourceImage := range sourceImages {
+	for _, originalImage := range originalImages {
 		var newerVersions []string
 
-		if sourceImage.Host == "quay.io" {
-			fmt.Printf("Image %s has quay.io address, skipping...\n", sourceImage)
+		if originalImage.Host == "quay.io" {
+			fmt.Printf("Image %s has quay.io address, skipping...\n", originalImage)
 			continue
 		}
 
-		sourceTag, err := version.NewVersion(sourceImage.Version)
+		sourceTag, err := version.NewVersion(originalImage.Version)
 		if err != nil {
-			fmt.Printf("skipping %v: %v\n", sourceImage, err)
+			fmt.Printf("skipping %v: %v\n", originalImage, err)
 			continue
 		}
 
 		var searchRepo string
-		if !strings.Contains(sourceImage.Repository, "/") {
-			searchRepo = "library/" + sourceImage.Repository
+		if !strings.Contains(originalImage.Repository, "/") {
+			searchRepo = "library/" + originalImage.Repository
 		} else {
-			searchRepo = sourceImage.Repository
+			searchRepo = originalImage.Repository
 		}
 
 		allTags, err := api.Tags(searchRepo)
@@ -80,7 +92,7 @@ func runCheckCommand(args []string) error {
 		for _, tag := range allTags {
 			upstreamTag, err := version.NewVersion(tag)
 			if err != nil {
-				fmt.Printf("skipping %v: %v\n", sourceImage, err)
+				fmt.Printf("skipping %v: %v\n", originalImage, err)
 				continue
 			}
 
@@ -90,9 +102,9 @@ func runCheckCommand(args []string) error {
 		}
 
 		if len(newerVersions) > 0 {
-			fmt.Printf("New versions for %v found: %v\n", sourceImage, newerVersions)
+			fmt.Printf("New versions for %v found: %v\n", originalImage, newerVersions)
 		} else {
-			fmt.Printf("%v is up to date!\n", sourceImage)
+			fmt.Printf("%v is up to date!\n", originalImage)
 		}
 	}
 

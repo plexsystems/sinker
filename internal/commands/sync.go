@@ -19,8 +19,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
-	"github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -37,9 +37,13 @@ func NewSyncCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "sync",
 		Short: "Sync the images found in the repository to another registry",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
+				return fmt.Errorf("bind flag: %w", err)
+			}
+
 			if err := runSyncCommand(logger, args); err != nil {
 				return fmt.Errorf("sync: %w", err)
 			}
@@ -49,6 +53,8 @@ func NewSyncCommand(logger *log.Logger) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
 
 	return &cmd
 }
@@ -66,57 +72,49 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 		return fmt.Errorf("get working dir: %w", err)
 	}
 
-	sourcePath := filepath.Join(workingDir, args[0])
-	destinationPath := filepath.Join(workingDir, args[1])
+	path := filepath.Join(workingDir, args[0])
 
-	sourceList, err := GetImagesInPath(sourcePath)
+	mirrorImages, err := GetImagesFromFile(path)
 	if err != nil {
 		return fmt.Errorf("get before list: %w", err)
 	}
 
-	destinationList, err := GetImagesInPath(destinationPath)
-	if err != nil {
-		return fmt.Errorf("get before list: %w", err)
+	var originalImages []DockerImage
+	for _, mirrorImage := range mirrorImages {
+		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
+		originalImages = append(originalImages, originalImage)
 	}
 
-	imageMap := getImageMap(sourceList, destinationList)
-	olderExists, err := olderSourceImagesExist(logger, imageMap)
-	if err != nil {
-		return fmt.Errorf("checking older versions: %w", err)
-	}
+	imageMap := getImageMap(originalImages, mirrorImages)
 
-	if olderExists {
-		return nil
-	}
-
-	if err := pullSourceImages(ctx, cli, logger, sourceList); err != nil {
+	if err := pullSourceImages(ctx, cli, logger, originalImages); err != nil {
 		return fmt.Errorf("pull source image: %w", err)
 	}
 
 	logger.Printf("Tagging images...")
-	for sourceImage, destinationImage := range imageMap {
-		if err := cli.ImageTag(ctx, sourceImage.String(), destinationImage.String()); err != nil {
+	for originalImage, mirrorImage := range imageMap {
+		if err := cli.ImageTag(ctx, originalImage.String(), mirrorImage.String()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
-	for _, image := range destinationList {
-		auth, err := getAuthForHost(image.Host)
+	for _, mirrorImage := range mirrorImages {
+		auth, err := getAuthForHost(mirrorImage.Host)
 		if err != nil {
 			return fmt.Errorf("getting auth: %w", err)
 		}
 
-		logger.Printf("Checking if exists at remote registry: %v\n", image.String())
-		imageExists, err := checkImageExistsAtRemote(ctx, cli, image, auth)
+		imageExists, err := checkImageExistsAtRemote(ctx, cli, mirrorImage, auth)
 		if err != nil {
 			return fmt.Errorf("checking image exists: %w", err)
 		}
 
 		if imageExists {
+			logger.Printf("Image %s exists at remote registry. Skipping...", mirrorImage.String())
 			continue
 		}
 
-		if err := pushImageAndWait(ctx, logger, cli, image, auth); err != nil {
+		if err := pushImageAndWait(ctx, logger, cli, mirrorImage, auth); err != nil {
 			return fmt.Errorf("pushing image to remote: %w", err)
 		}
 	}
@@ -230,41 +228,15 @@ func getAuthForHost(host string) (string, error) {
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
-func olderSourceImagesExist(logger *log.Logger, imageMap map[DockerImage]DockerImage) (bool, error) {
-	var olderSourceExists bool
-	for sourceImage, destinationImage := range imageMap {
-		sourceVersion, err := version.NewVersion(sourceImage.Version)
-		if err != nil {
-			return false, fmt.Errorf("new source version: %w", err)
-		}
-
-		destinationVersion, err := version.NewVersion(destinationImage.Version)
-		if err != nil {
-			return false, fmt.Errorf("new destination version: %w", err)
-		}
-
-		if sourceVersion.LessThan(destinationVersion) {
-			logger.Printf("Source image %v is older than %v\n", sourceImage, destinationImage)
-			olderSourceExists = true
-		}
-	}
-
-	if olderSourceExists {
-		logger.Printf("One or more source images are older than the destination. Update the manifests before syncing.\n")
-	}
-
-	return olderSourceExists, nil
-}
-
 func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, sourceImages []DockerImage) error {
 	for _, image := range sourceImages {
-		logger.Printf("Checking if exists locally: %s", image)
 		exists, err := imageExistsLocally(ctx, cli, image)
 		if err != nil {
 			return fmt.Errorf("checking local image: %w", err)
 		}
 
 		if exists {
+			logger.Printf("Image %s exists locally. Skipping...", image.String())
 			continue
 		}
 
@@ -306,6 +278,10 @@ func imageExistsLocally(ctx context.Context, cli *client.Client, image DockerIma
 	imageList, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("getting image list: %w", err)
+	}
+
+	if image.Host == "docker.io" {
+		image.Host = ""
 	}
 
 	for _, imageSummary := range imageList {
