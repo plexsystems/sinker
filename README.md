@@ -2,7 +2,7 @@
 
 `imagesync` enables the syncing of container images from one container registry to another. This is useful in cases where you need to mirror images that exist in a public container registry, to a private one.
 
-While this tool does not need to be Kubernetes specific, currently the **list** command finds all Kubernetes manifests and extracts the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
+While this tool is not Kubernetes specific, currently the **list** command finds all Kubernetes manifests and extracts the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
 
 All other commands use the produced file from the `list` command. If you need to sync images that are not referenced in Kubernetes manifests, you can create your own images list:
 
