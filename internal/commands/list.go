@@ -180,6 +180,7 @@ func getOriginalImage(dockerImage DockerImage, mirrorPrefix string) DockerImage 
 	quayMappings := []string{
 		"kubernetes-ingress-controller",
 		"coreos",
+		"open-policy-agent",
 	}
 
 	originalHost := "docker.io"
