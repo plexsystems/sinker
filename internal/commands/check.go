@@ -18,6 +18,7 @@ func NewCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the remote registry",
+		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {

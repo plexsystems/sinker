@@ -11,9 +11,10 @@ import (
 // NewDefaultCommand creates a new default command
 func NewDefaultCommand() *cobra.Command {
 	cmd := cobra.Command{
-		Use:   path.Base(os.Args[0]),
-		Short: "imagesync",
-		Long:  "A cli tool to sync docker images in a repository",
+		Use:     path.Base(os.Args[0]),
+		Short:   "imagesync",
+		Long:    "A cli tool to sync docker images to another registry",
+		Version: "0.3.0",
 	}
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
