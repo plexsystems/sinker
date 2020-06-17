@@ -14,7 +14,7 @@ func NewDefaultCommand() *cobra.Command {
 		Use:     path.Base(os.Args[0]),
 		Short:   "imagesync",
 		Long:    "A cli tool to sync docker images to another registry",
-		Version: "0.3.0",
+		Version: "0.3.1",
 	}
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
