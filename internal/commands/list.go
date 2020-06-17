@@ -48,6 +48,10 @@ func NewListCommand() *cobra.Command {
 				return fmt.Errorf("bind flag: %w", err)
 			}
 
+			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
+				return fmt.Errorf("bind flag: %w", err)
+			}
+
 			if err := runListCommand(args); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
@@ -57,13 +61,58 @@ func NewListCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("output", "o", "", "output path for the image list")
+	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
 
 	return &cmd
+}
+
+func runListCommand(args []string) error {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working dir: %w", err)
+	}
+
+	listPath := filepath.Join(workingDir, args[0])
+
+	var images []DockerImage
+	if filepath.Ext(listPath) == ".txt" && viper.GetString("mirror") != "" {
+		originalImages, err := GetImagesFromFile(listPath)
+		if err != nil {
+			return fmt.Errorf("get images from path: %w", err)
+		}
+
+		for _, originalImage := range originalImages {
+			image := getOriginalImage(originalImage, viper.GetString("mirror"))
+			images = append(images, image)
+		}
+	} else {
+		images, err = GetImagesFromYaml(listPath)
+		if err != nil {
+			return fmt.Errorf("get images from path: %w", err)
+		}
+	}
+
+	if viper.GetString("output") != "" {
+		outputFile := filepath.Join(workingDir, viper.GetString("output"))
+		if err := writeListToFile(images, outputFile); err != nil {
+			return fmt.Errorf("writing list to file: %w", err)
+		}
+	} else {
+		for _, image := range images {
+			fmt.Println(image)
+		}
+	}
+
+	return nil
 }
 
 // GetImagesFromFile reads in a text file of images and returns
 // them as DockerImage types
 func GetImagesFromFile(filePath string) ([]DockerImage, error) {
+	if filepath.Ext(filePath) != ".txt" {
+		return nil, fmt.Errorf("expected .txt file")
+	}
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("opening file: %w", err)
@@ -111,7 +160,21 @@ func GetImagesFromYaml(path string) ([]DockerImage, error) {
 				return nil, fmt.Errorf("unmarshal prometheus: %w", err)
 			}
 
-			prometheusImage := prometheus.Spec.BaseImage + ":" + prometheus.Spec.Version
+			var prometheusImage string
+			if prometheus.Spec.BaseImage != "" {
+				prometheusImage = prometheus.Spec.BaseImage + ":" + prometheus.Spec.Version
+			} else {
+				prometheusImage = *prometheus.Spec.Image
+			}
+
+			if len(prometheus.Spec.Containers) > 0 {
+				imageList = append(imageList, getImagesFromContainers(prometheus.Spec.Containers)...)
+			}
+
+			if len(prometheus.Spec.InitContainers) > 0 {
+				imageList = append(imageList, getImagesFromContainers(prometheus.Spec.InitContainers)...)
+			}
+
 			imageList = append(imageList, prometheusImage)
 			continue
 		}
@@ -122,7 +185,21 @@ func GetImagesFromYaml(path string) ([]DockerImage, error) {
 				return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
 			}
 
-			alertmanagerImage := alertmanager.Spec.BaseImage + ":" + alertmanager.Spec.Version
+			var alertmanagerImage string
+			if alertmanager.Spec.BaseImage != "" {
+				alertmanagerImage = alertmanager.Spec.BaseImage + ":" + alertmanager.Spec.Version
+			} else {
+				alertmanagerImage = *alertmanager.Spec.Image
+			}
+
+			if len(alertmanager.Spec.Containers) > 0 {
+				imageList = append(imageList, getImagesFromContainers(alertmanager.Spec.Containers)...)
+			}
+
+			if len(alertmanager.Spec.InitContainers) > 0 {
+				imageList = append(imageList, getImagesFromContainers(alertmanager.Spec.InitContainers)...)
+			}
+
 			imageList = append(imageList, alertmanagerImage)
 			continue
 		}
@@ -148,32 +225,6 @@ func GetImagesFromYaml(path string) ([]DockerImage, error) {
 	marshaledImages := marshalImages(dedupedImageList)
 
 	return marshaledImages, nil
-}
-
-func runListCommand(args []string) error {
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
-	}
-
-	listPath := filepath.Join(workingDir, args[0])
-	images, err := GetImagesFromYaml(listPath)
-	if err != nil {
-		return fmt.Errorf("get images from path: %w", err)
-	}
-
-	if viper.GetString("output") != "" {
-		outputFile := filepath.Join(workingDir, viper.GetString("output"))
-		if err := writeListToFile(images, outputFile); err != nil {
-			return fmt.Errorf("writing list to file: %w", err)
-		}
-	} else {
-		for _, image := range images {
-			fmt.Println(image)
-		}
-	}
-
-	return nil
 }
 
 func getOriginalImage(dockerImage DockerImage, mirrorPrefix string) DockerImage {
