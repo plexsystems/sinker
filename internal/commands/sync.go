@@ -11,9 +11,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"cuelang.org/go/pkg/strings"
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/credentials"
 	"github.com/docker/docker/api/types"
@@ -84,14 +84,14 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 		originalImages = append(originalImages, originalImage)
 	}
 
-	imageMap := getImageMap(originalImages, mirrorImages)
-
 	if err := pullSourceImages(ctx, cli, logger, originalImages); err != nil {
 		return fmt.Errorf("pull source image: %w", err)
 	}
 
-	logger.Printf("Tagging images...")
+	logger.Printf("Tagging images ...")
+	imageMap := getImageMap(originalImages, mirrorImages)
 	for originalImage, mirrorImage := range imageMap {
+		logger.Printf("Tagging image %s -> %s ...", originalImage.String(), mirrorImage.String())
 		if err := cli.ImageTag(ctx, originalImage.String(), mirrorImage.String()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
@@ -109,7 +109,7 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 		}
 
 		if imageExists {
-			logger.Printf("Image %s exists at remote registry. Skipping...", mirrorImage.String())
+			logger.Printf("Image %s exists at remote registry. Skipping ...", mirrorImage.String())
 			continue
 		}
 
@@ -195,7 +195,7 @@ func waitForImagePush(ctx context.Context, logger *log.Logger, cli *client.Clien
 			return false, fmt.Errorf("checking remote image: %w", err)
 		}
 
-		logger.Printf("Pushing %s...\n", image)
+		logger.Printf("Pushing %s ...\n", image)
 		return exists, nil
 	})
 }
@@ -235,7 +235,7 @@ func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logge
 		}
 
 		if exists {
-			logger.Printf("Image %s exists locally. Skipping...", image.String())
+			logger.Printf("Image %s exists locally. Skipping ...", image.String())
 			continue
 		}
 
@@ -268,7 +268,7 @@ func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Clien
 			return false, fmt.Errorf("checking local image: %w", err)
 		}
 
-		logger.Printf("Pulling %s...\n", image)
+		logger.Printf("Pulling %s ...\n", image)
 		return exists, nil
 	})
 }
@@ -299,7 +299,7 @@ func getImageMap(sourceImages []ContainerImage, destinationImages []ContainerIma
 
 	for _, sourceImage := range sourceImages {
 		for _, destinationImage := range destinationImages {
-			if strings.Contains(destinationImage.Name, sourceImage.Name) {
+			if strings.EqualFold(destinationImage.Name, sourceImage.Name) {
 				imageMap[sourceImage] = destinationImage
 				break
 			}
