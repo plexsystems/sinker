@@ -13,8 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NewCheckCommand creates a new list command
-func NewCheckCommand() *cobra.Command {
+func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the remote registry",
@@ -51,7 +50,7 @@ func runCheckCommand(args []string) error {
 		return fmt.Errorf("get images from file: %w", err)
 	}
 
-	var originalImages []DockerImage
+	var originalImages []ContainerImage
 	for _, mirrorImage := range mirrorImages {
 		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
 		originalImages = append(originalImages, originalImage)

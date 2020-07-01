@@ -19,9 +19,9 @@ func NewDefaultCommand() *cobra.Command {
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
-	cmd.AddCommand(NewListCommand())
-	cmd.AddCommand(NewSyncCommand(logger))
-	cmd.AddCommand(NewCheckCommand())
+	cmd.AddCommand(newListCommand())
+	cmd.AddCommand(newSyncCommand(logger))
+	cmd.AddCommand(newCheckCommand())
 
 	return &cmd
 }

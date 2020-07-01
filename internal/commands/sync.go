@@ -32,8 +32,7 @@ const (
 	WaitTime = 5 * time.Minute
 )
 
-// NewSyncCommand creates a new sync command
-func NewSyncCommand(logger *log.Logger) *cobra.Command {
+func newSyncCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "sync",
 		Short: "Sync the images found in the repository to another registry",
@@ -79,7 +78,7 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 		return fmt.Errorf("get before list: %w", err)
 	}
 
-	var originalImages []DockerImage
+	var originalImages []ContainerImage
 	for _, mirrorImage := range mirrorImages {
 		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
 		originalImages = append(originalImages, originalImage)
@@ -122,7 +121,7 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 	return nil
 }
 
-func checkImageExistsAtRemote(ctx context.Context, cli *client.Client, image DockerImage, auth string) (bool, error) {
+func checkImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, auth string) (bool, error) {
 	_, err := cli.ImagePull(ctx, image.String(), types.ImagePullOptions{
 		RegistryAuth: auth,
 	})
@@ -137,7 +136,7 @@ func checkImageExistsAtRemote(ctx context.Context, cli *client.Client, image Doc
 	return true, nil
 }
 
-func pushImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image DockerImage, auth string) error {
+func pushImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, auth string) error {
 	reader, err := cli.ImagePush(ctx, image.String(), types.ImagePushOptions{
 		RegistryAuth: auth,
 	})
@@ -189,8 +188,8 @@ func pushImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Clien
 	return nil
 }
 
-func waitForImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image DockerImage, auth string) error {
-	return wait.PollImmediate(Interval, 5*time.Minute, func() (bool, error) {
+func waitForImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, auth string) error {
+	return wait.PollImmediate(Interval, WaitTime, func() (bool, error) {
 		exists, err := checkImageExistsAtRemote(ctx, cli, image, auth)
 		if err != nil {
 			return false, fmt.Errorf("checking remote image: %w", err)
@@ -228,7 +227,7 @@ func getAuthForHost(host string) (string, error) {
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
-func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, sourceImages []DockerImage) error {
+func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, sourceImages []ContainerImage) error {
 	for _, image := range sourceImages {
 		exists, err := imageExistsLocally(ctx, cli, image)
 		if err != nil {
@@ -248,7 +247,7 @@ func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logge
 	return nil
 }
 
-func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image DockerImage) error {
+func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
 	reader, err := cli.ImagePull(ctx, image.String(), types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("pulling image: %w", err)
@@ -262,8 +261,8 @@ func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Clien
 	return nil
 }
 
-func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Client, image DockerImage) error {
-	return wait.PollImmediate(Interval, 5*time.Minute, func() (bool, error) {
+func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
+	return wait.PollImmediate(Interval, WaitTime, func() (bool, error) {
 		exists, err := imageExistsLocally(ctx, cli, image)
 		if err != nil {
 			return false, fmt.Errorf("checking local image: %w", err)
@@ -274,7 +273,7 @@ func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Clien
 	})
 }
 
-func imageExistsLocally(ctx context.Context, cli *client.Client, image DockerImage) (bool, error) {
+func imageExistsLocally(ctx context.Context, cli *client.Client, image ContainerImage) (bool, error) {
 	imageList, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("getting image list: %w", err)
@@ -295,8 +294,8 @@ func imageExistsLocally(ctx context.Context, cli *client.Client, image DockerIma
 	return false, nil
 }
 
-func getImageMap(sourceImages []DockerImage, destinationImages []DockerImage) map[DockerImage]DockerImage {
-	imageMap := make(map[DockerImage]DockerImage)
+func getImageMap(sourceImages []ContainerImage, destinationImages []ContainerImage) map[ContainerImage]ContainerImage {
+	imageMap := make(map[ContainerImage]ContainerImage)
 
 	for _, sourceImage := range sourceImages {
 		for _, destinationImage := range destinationImages {

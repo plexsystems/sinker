@@ -18,14 +18,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DockerImage struct {
+// ContainerImage ...
+type ContainerImage struct {
 	Host       string
 	Name       string
 	Repository string
 	Version    string
 }
 
-func (d DockerImage) String() string {
+func (d ContainerImage) String() string {
 	var output string
 	if d.Host != "" {
 		output = d.Host + "/"
@@ -36,8 +37,7 @@ func (d DockerImage) String() string {
 	return output
 }
 
-// NewListCommand creates a new list command
-func NewListCommand() *cobra.Command {
+func newListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "list",
 		Short: "List the images found in the repository",
@@ -74,7 +74,7 @@ func runListCommand(args []string) error {
 
 	listPath := filepath.Join(workingDir, args[0])
 
-	var images []DockerImage
+	var images []ContainerImage
 	if filepath.Ext(listPath) == ".txt" && viper.GetString("mirror") != "" {
 		originalImages, err := GetImagesFromFile(listPath)
 		if err != nil {
@@ -106,9 +106,8 @@ func runListCommand(args []string) error {
 	return nil
 }
 
-// GetImagesFromFile reads in a text file of images and returns
-// them as DockerImage types
-func GetImagesFromFile(filePath string) ([]DockerImage, error) {
+// GetImagesFromFile returns a collection of images from a text file
+func GetImagesFromFile(filePath string) ([]ContainerImage, error) {
 	if filepath.Ext(filePath) != ".txt" {
 		return nil, fmt.Errorf("expected .txt file")
 	}
@@ -136,7 +135,7 @@ func GetImagesFromFile(filePath string) ([]DockerImage, error) {
 
 // GetImagesFromYaml finds all yaml files in a given path and returns
 // all of the images found in the manifests
-func GetImagesFromYaml(path string) ([]DockerImage, error) {
+func GetImagesFromYaml(path string) ([]ContainerImage, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -227,16 +226,15 @@ func GetImagesFromYaml(path string) ([]DockerImage, error) {
 	return marshaledImages, nil
 }
 
-func getOriginalImage(dockerImage DockerImage, mirrorPrefix string) DockerImage {
+func getOriginalImage(image ContainerImage, mirrorPrefix string) ContainerImage {
 	quayMappings := []string{
 		"kubernetes-ingress-controller",
 		"coreos",
-		"open-policy-agent",
 	}
 
 	originalHost := "docker.io"
 	for _, quayMapping := range quayMappings {
-		if strings.Contains(dockerImage.Repository, quayMapping) {
+		if strings.Contains(image.Repository, quayMapping) {
 			originalHost = "quay.io"
 		}
 	}
@@ -244,21 +242,21 @@ func getOriginalImage(dockerImage DockerImage, mirrorPrefix string) DockerImage 
 	var originalRepository string
 	if strings.Contains(mirrorPrefix, "/") {
 		mirrorRepository := strings.SplitN(mirrorPrefix, "/", 2)[1]
-		originalRepository = strings.Replace(dockerImage.Repository, mirrorRepository+"/", "", 1)
+		originalRepository = strings.Replace(image.Repository, mirrorRepository+"/", "", 1)
 	}
 
-	originalImage := DockerImage{
+	originalImage := ContainerImage{
 		Host:       originalHost,
 		Repository: originalRepository,
-		Name:       dockerImage.Name,
-		Version:    dockerImage.Version,
+		Name:       image.Name,
+		Version:    image.Version,
 	}
 
 	return originalImage
 }
 
-func marshalImages(images []string) []DockerImage {
-	var marshaledImages []DockerImage
+func marshalImages(images []string) []ContainerImage {
+	var containerImages []ContainerImage
 	for _, image := range images {
 		imageTokens := strings.Split(image, ":")
 		imagePaths := strings.Split(imageTokens[0], "/")
@@ -278,20 +276,20 @@ func marshalImages(images []string) []DockerImage {
 			imageRepository = imageTokens[0]
 		}
 
-		dockerImage := DockerImage{
+		containerImage := ContainerImage{
 			Host:       imageHost,
 			Repository: imageRepository,
 			Name:       imageName,
 			Version:    imageTokens[1],
 		}
 
-		marshaledImages = append(marshaledImages, dockerImage)
+		containerImages = append(containerImages, containerImage)
 	}
 
-	return marshaledImages
+	return containerImages
 }
 
-func writeListToFile(images []DockerImage, outputFile string) error {
+func writeListToFile(images []ContainerImage, outputFile string) error {
 	f, err := os.Create(outputFile)
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
