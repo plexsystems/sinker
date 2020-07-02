@@ -31,20 +31,15 @@ type Mirror struct {
 	Repository string `json:"repository,omitempty"`
 }
 
-func (m Mirror) String() string {
-	return m.Registry + "/" + m.Repository
-}
-
 func newMirror(mirrorLocation string) Mirror {
 	var registry string
 	var repository string
-
 	mirrorTokens := strings.Split(mirrorLocation, "/")
-	if len(mirrorTokens) == 0 {
-		registry = mirrorLocation
-	} else {
+	if len(mirrorTokens) > 1 {
 		registry = mirrorTokens[0]
-		repository = strings.Join(mirrorTokens[1:len(registry)-1], "/")
+		repository = strings.Join(mirrorTokens[1:], "/")
+	} else {
+		registry = mirrorLocation
 	}
 
 	mirror := Mirror{
@@ -53,6 +48,10 @@ func newMirror(mirrorLocation string) Mirror {
 	}
 
 	return mirror
+}
+
+func (m Mirror) String() string {
+	return m.Registry + "/" + m.Repository
 }
 
 // ContainerImage is a container image found in a repository
@@ -67,8 +66,12 @@ func (c ContainerImage) String() string {
 	return c.Repository + ":" + c.Version
 }
 
-// Original ...
+// Origin returns the origin image
 func (c ContainerImage) Origin() string {
+	if c.OriginRegistry == "" {
+		return c.Repository + ":" + c.Version
+	}
+
 	return c.OriginRegistry + "/" + c.Repository + ":" + c.Version
 }
 
@@ -96,28 +99,30 @@ func newGetCommand() *cobra.Command {
 }
 
 func runGetCommand(path string) error {
-	foundImages, err := GetFromKubernetesManifests(path)
-	if err != nil {
-		return fmt.Errorf("get from kubernetes manifests: %w", err)
-	}
-
 	var imageManifest ImageManifest
-	if _, err := os.Stat(manifestFileName); os.IsNotExist(err) {
-		imageManifest.Images = foundImages
-	} else {
-		currentManifest, err := getManifest(manifestFileName)
+	if _, err := os.Stat(manifestFileName); !os.IsNotExist(err) {
+		imageManifest, err = getManifest(path)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
-		}
-
-		imageManifest.Images, err = getUpdatedImages(foundImages, currentManifest)
-		if err != nil {
-			return fmt.Errorf("get updated images: %w", err)
 		}
 	}
 
 	if viper.GetString("mirror") != "" {
 		imageManifest.Mirror = newMirror(viper.GetString("mirror"))
+	}
+
+	foundImages, err := getFromKubernetesManifests(path, imageManifest.Mirror)
+	if err != nil {
+		return fmt.Errorf("get from kubernetes manifests: %w", err)
+	}
+
+	if _, err := os.Stat(manifestFileName); os.IsNotExist(err) {
+		imageManifest.Images = foundImages
+	} else {
+		imageManifest.Images, err = getUpdatedImages(foundImages, imageManifest)
+		if err != nil {
+			return fmt.Errorf("get updated images: %w", err)
+		}
 	}
 
 	if err := writeManifest(imageManifest); err != nil {
@@ -141,8 +146,7 @@ func getManifest(path string) (ImageManifest, error) {
 	return currentImageManifest, nil
 }
 
-// GetFromKubernetesManifests finds all container images in Kubernetes manifests
-func GetFromKubernetesManifests(path string) ([]ContainerImage, error) {
+func getFromKubernetesManifests(path string, mirror Mirror) ([]ContainerImage, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -228,40 +232,42 @@ func GetFromKubernetesManifests(path string) ([]ContainerImage, error) {
 	}
 
 	dedupedImageList := dedupeImages(imageList)
-	marshaledImages := marshalImages(dedupedImageList)
+	marshaledImages := marshalImages(dedupedImageList, mirror)
 
 	return marshaledImages, nil
 }
 
-func marshalImages(images []string) []ContainerImage {
+func marshalImages(images []string, mirror Mirror) []ContainerImage {
 	var containerImages []ContainerImage
 	for _, image := range images {
 		imageTokens := strings.Split(image, ":")
 		imagePaths := strings.Split(imageTokens[0], "/")
 
 		var imageHost string
-		var imageRepository string
 		if strings.Contains(imagePaths[0], ".io") {
 			imageHost = imagePaths[0]
 		} else {
 			imageHost = ""
 		}
 
+		var imageRepository string
 		if imageHost != "" {
 			imageRepository = strings.TrimPrefix(imageTokens[0], imageHost+"/")
 		} else {
 			imageRepository = imageTokens[0]
 		}
+		imageRepository = strings.Replace(imageRepository, mirror.Repository+"/", "", 1)
 
-		quayMappings := []string{
-			"kubernetes-ingress-controller",
-			"coreos",
+		repositoryMappings := map[string]string{
+			"kubernetes-ingress-controller": "quay.io",
+			"coreos":                        "quay.io",
+			"twistlock":                     "registry.twistlock.com",
 		}
 
 		originRegistry := "docker.io"
-		for _, quayMapping := range quayMappings {
-			if strings.Contains(imageRepository, quayMapping) {
-				originRegistry = "quay.io"
+		for repository, registry := range repositoryMappings {
+			if strings.Contains(imageRepository, repository) {
+				originRegistry = registry
 			}
 		}
 
@@ -297,6 +303,7 @@ func getUpdatedImages(images []ContainerImage, manifest ImageManifest) ([]Contai
 			if currentImage.Repository == updatedImage.Repository {
 				updatedImage.AccessKey = currentImage.AccessKey
 				updatedImage.Repository = currentImage.Repository
+				updatedImage.OriginRegistry = currentImage.OriginRegistry
 			}
 		}
 

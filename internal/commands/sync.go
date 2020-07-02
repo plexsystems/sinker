@@ -24,7 +24,6 @@ func newSyncCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "sync",
 		Short: "Sync images in the manifest to the mirror registry",
-		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
@@ -53,7 +52,7 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	if err := pullSourceImages(ctx, cli, logger, currentManifest); err != nil {
+	if err := pullOriginImages(ctx, cli, logger, currentManifest); err != nil {
 		return fmt.Errorf("pull source image: %w", err)
 	}
 
@@ -196,7 +195,7 @@ func getAuthForOriginRegistry(registry string) (string, error) {
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
-func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, manifest ImageManifest) error {
+func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logger, manifest ImageManifest) error {
 	for _, image := range manifest.Images {
 		exists, err := originImageExistsLocally(ctx, cli, image)
 		if err != nil {
