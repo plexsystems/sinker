@@ -207,7 +207,7 @@ func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logge
 			continue
 		}
 
-		if err := pullImageAndWait(ctx, logger, cli, image); err != nil {
+		if err := pullOriginImageAndWait(ctx, logger, cli, image); err != nil {
 			return fmt.Errorf("pulling image: %w", err)
 		}
 	}
@@ -215,13 +215,13 @@ func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logge
 	return nil
 }
 
-func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
+func pullOriginImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
 	reader, err := cli.ImagePull(ctx, image.Origin(), types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("pulling image: %w", err)
 	}
 
-	if err := waitForImagePull(ctx, logger, cli, image); err != nil {
+	if err := waitForOriginImagePull(ctx, logger, cli, image); err != nil {
 		return fmt.Errorf("waiting for pull: %w", err)
 	}
 	reader.Close()
@@ -229,7 +229,7 @@ func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Clien
 	return nil
 }
 
-func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
+func waitForOriginImagePull(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
 	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
 		exists, err := originImageExistsLocally(ctx, cli, image)
 		if err != nil {
