@@ -59,7 +59,13 @@ type ContainerImage struct {
 	Repository     string `json:"repository"`
 	Version        string `json:"version"`
 	OriginRegistry string `json:"origin,omitempty"`
-	AccessKey      string `json:"accesskey,omitempty"`
+	Auth           Auth   `json:"auth,omitempty"`
+}
+
+// Auth is a username and password to log into the registry
+type Auth struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 func (c ContainerImage) String() string {
@@ -301,7 +307,7 @@ func getUpdatedImages(images []ContainerImage, manifest ImageManifest) ([]Contai
 	for _, updatedImage := range images {
 		for _, currentImage := range manifest.Images {
 			if currentImage.Repository == updatedImage.Repository {
-				updatedImage.AccessKey = currentImage.AccessKey
+				updatedImage.Auth = currentImage.Auth
 				updatedImage.Repository = currentImage.Repository
 				updatedImage.OriginRegistry = currentImage.OriginRegistry
 			}

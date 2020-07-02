@@ -2,6 +2,9 @@ images:
 - origin: docker.io
   repository: nginx
   version: 1.14.2
+  auth:
+    username: MY_USER
+    password: MY_PASS
 - origin: docker.io
   repository: openpolicyagent/gatekeeper
   version: v3.1.0-beta.10
