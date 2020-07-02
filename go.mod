@@ -3,7 +3,6 @@ module github.com/plexsystems/imagesync
 go 1.14
 
 require (
-	cuelang.org/go v0.1.2
 	github.com/Microsoft/hcsshim v0.8.9 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
 	github.com/coreos/prometheus-operator v0.39.0
@@ -13,6 +12,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.6.3 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/hashicorp/go-version v1.2.0
 	github.com/heroku/docker-registry-client v0.0.0-20190909225348-afc9e1acc3d5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect

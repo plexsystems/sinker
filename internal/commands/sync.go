@@ -299,7 +299,7 @@ func getImageMap(sourceImages []ContainerImage, destinationImages []ContainerIma
 
 	for _, sourceImage := range sourceImages {
 		for _, destinationImage := range destinationImages {
-			if strings.EqualFold(destinationImage.Name, sourceImage.Name) {
+			if strings.EqualFold(destinationImage.Repository, sourceImage.Repository) {
 				imageMap[sourceImage] = destinationImage
 				break
 			}
