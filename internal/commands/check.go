@@ -2,58 +2,35 @@ package commands
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"unicode"
 
 	"github.com/hashicorp/go-version"
 	"github.com/heroku/docker-registry-client/registry"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the remote registry",
-		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
-				return fmt.Errorf("bind flag: %w", err)
-			}
-
-			if err := runCheckCommand(args); err != nil {
-				return fmt.Errorf("check: %w", err)
+			if err := runCheckCommand("."); err != nil {
+				return fmt.Errorf("run check: %w", err)
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
-
 	return &cmd
 }
 
-func runCheckCommand(args []string) error {
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
-	}
-
-	imageListPath := filepath.Join(workingDir, args[0])
-
-	mirrorImages, err := GetImagesFromFile(imageListPath)
+func runCheckCommand(path string) error {
+	imageManifest, err := getManifest(path)
 	if err != nil {
 		return fmt.Errorf("get images from file: %w", err)
-	}
-
-	var originalImages []ContainerImage
-	for _, mirrorImage := range mirrorImages {
-		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
-		originalImages = append(originalImages, originalImage)
 	}
 
 	api, err := registry.New("https://registry-1.docker.io/", "", "")
@@ -62,25 +39,25 @@ func runCheckCommand(args []string) error {
 	}
 	api.Logf = registry.Quiet
 
-	for _, originalImage := range originalImages {
+	for _, image := range imageManifest.Images {
 		var newerVersions []string
 
-		if originalImage.Host == "quay.io" {
-			fmt.Printf("Image %s has quay.io address, skipping...\n", originalImage)
+		if image.OriginRegistry == "quay.io" {
+			fmt.Printf("Image %s has quay.io address, skipping...\n", image)
 			continue
 		}
 
-		sourceTag, err := version.NewVersion(originalImage.Version)
+		sourceTag, err := version.NewVersion(image.Version)
 		if err != nil {
-			fmt.Printf("skipping %v: %v\n", originalImage, err)
+			fmt.Printf("skipping %v: %v\n", image, err)
 			continue
 		}
 
 		var searchRepo string
-		if !strings.Contains(originalImage.Repository, "/") {
-			searchRepo = "library/" + originalImage.Repository
+		if !strings.Contains(image.Repository, "/") {
+			searchRepo = "library/" + image.Repository
 		} else {
-			searchRepo = originalImage.Repository
+			searchRepo = image.Repository
 		}
 
 		allTags, err := api.Tags(searchRepo)
@@ -92,7 +69,7 @@ func runCheckCommand(args []string) error {
 		for _, tag := range allTags {
 			upstreamTag, err := version.NewVersion(tag)
 			if err != nil {
-				fmt.Printf("skipping %v: %v\n", originalImage, err)
+				fmt.Printf("skipping %v: %v\n", image, err)
 				continue
 			}
 
@@ -102,9 +79,9 @@ func runCheckCommand(args []string) error {
 		}
 
 		if len(newerVersions) > 0 {
-			fmt.Printf("New versions for %v found: %v\n", originalImage, newerVersions)
+			fmt.Printf("New versions for %v found: %v\n", image, newerVersions)
 		} else {
-			fmt.Printf("%v is up to date!\n", originalImage)
+			fmt.Printf("%v is up to date!\n", image)
 		}
 	}
 

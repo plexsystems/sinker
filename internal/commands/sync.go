@@ -9,9 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/docker/cli/cli/config"
@@ -20,30 +17,19 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/wait"
-)
-
-const (
-	// Interval defines the frequency in which to check if a Docker operation has completed
-	Interval = 5 * time.Second
-
-	// WaitTime defines how long to wait for Docker to complete the operation
-	WaitTime = 5 * time.Minute
 )
 
 func newSyncCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "sync",
-		Short: "Sync the images found in the repository to another registry",
+		Short: "Sync images in the manifest to the mirror registry",
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
-				return fmt.Errorf("bind flag: %w", err)
-			}
+			ctx := context.Background()
 
-			if err := runSyncCommand(logger, args); err != nil {
+			if err := runSyncCommand(ctx, logger, "."); err != nil {
 				return fmt.Errorf("sync: %w", err)
 			}
 
@@ -53,67 +39,49 @@ func newSyncCommand(logger *log.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
-
 	return &cmd
 }
 
-func runSyncCommand(logger *log.Logger, args []string) error {
-	ctx := context.Background()
-
+func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	workingDir, err := os.Getwd()
+	currentManifest, err := getManifest(path)
 	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
+		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	path := filepath.Join(workingDir, args[0])
-
-	mirrorImages, err := GetImagesFromFile(path)
-	if err != nil {
-		return fmt.Errorf("get before list: %w", err)
-	}
-
-	var originalImages []ContainerImage
-	for _, mirrorImage := range mirrorImages {
-		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
-		originalImages = append(originalImages, originalImage)
-	}
-
-	if err := pullSourceImages(ctx, cli, logger, originalImages); err != nil {
+	if err := pullSourceImages(ctx, cli, logger, currentManifest); err != nil {
 		return fmt.Errorf("pull source image: %w", err)
 	}
 
 	logger.Printf("Tagging images ...")
-	imageMap := getImageMap(originalImages, mirrorImages)
-	for originalImage, mirrorImage := range imageMap {
-		logger.Printf("Tagging image %s -> %s ...", originalImage.String(), mirrorImage.String())
-		if err := cli.ImageTag(ctx, originalImage.String(), mirrorImage.String()); err != nil {
+	for _, image := range currentManifest.Images {
+		logger.Printf("Tagging image %s -> %s ...", image.Origin(), image.String())
+		if err := cli.ImageTag(ctx, image.Origin(), image.String()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
-	for _, mirrorImage := range mirrorImages {
-		auth, err := getAuthForHost(mirrorImage.Host)
+	for _, image := range currentManifest.Images {
+		auth, err := getAuthForOriginRegistry(image.OriginRegistry)
 		if err != nil {
 			return fmt.Errorf("getting auth: %w", err)
 		}
 
-		imageExists, err := checkImageExistsAtRemote(ctx, cli, mirrorImage, auth)
+		imageExists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, currentManifest.Mirror, auth)
 		if err != nil {
 			return fmt.Errorf("checking image exists: %w", err)
 		}
 
 		if imageExists {
-			logger.Printf("Image %s exists at remote registry. Skipping ...", mirrorImage.String())
+			logger.Printf("Image %s exists at remote registry. Skipping ...", image.String())
 			continue
 		}
 
-		if err := pushImageAndWait(ctx, logger, cli, mirrorImage, auth); err != nil {
+		if err := pushImageToMirrorAndWait(ctx, logger, cli, image, currentManifest.Mirror, auth); err != nil {
 			return fmt.Errorf("pushing image to remote: %w", err)
 		}
 	}
@@ -121,7 +89,7 @@ func runSyncCommand(logger *log.Logger, args []string) error {
 	return nil
 }
 
-func checkImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, auth string) (bool, error) {
+func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, mirror Mirror, auth string) (bool, error) {
 	_, err := cli.ImagePull(ctx, image.String(), types.ImagePullOptions{
 		RegistryAuth: auth,
 	})
@@ -136,8 +104,9 @@ func checkImageExistsAtRemote(ctx context.Context, cli *client.Client, image Con
 	return true, nil
 }
 
-func pushImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, auth string) error {
-	reader, err := cli.ImagePush(ctx, image.String(), types.ImagePushOptions{
+func pushImageToMirrorAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror, auth string) error {
+	pushDestination := mirror.String() + image.String()
+	reader, err := cli.ImagePush(ctx, pushDestination, types.ImagePushOptions{
 		RegistryAuth: auth,
 	})
 	if err != nil {
@@ -181,16 +150,16 @@ func pushImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Clien
 		}
 	}
 
-	if err := waitForImagePush(ctx, logger, cli, image, auth); err != nil {
+	if err := waitForMirrorImagePush(ctx, logger, cli, image, mirror, auth); err != nil {
 		return fmt.Errorf("waiting for push: %w", err)
 	}
 
 	return nil
 }
 
-func waitForImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, auth string) error {
-	return wait.PollImmediate(Interval, WaitTime, func() (bool, error) {
-		exists, err := checkImageExistsAtRemote(ctx, cli, image, auth)
+func waitForMirrorImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror, auth string) error {
+	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		exists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, mirror, auth)
 		if err != nil {
 			return false, fmt.Errorf("checking remote image: %w", err)
 		}
@@ -200,7 +169,7 @@ func waitForImagePush(ctx context.Context, logger *log.Logger, cli *client.Clien
 	})
 }
 
-func getAuthForHost(host string) (string, error) {
+func getAuthForOriginRegistry(registry string) (string, error) {
 	cfg, err := config.Load(config.Dir())
 	if err != nil {
 		return "", fmt.Errorf("loading docker config: %w", err)
@@ -210,11 +179,11 @@ func getAuthForHost(host string) (string, error) {
 		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
 	}
 
-	if host == "" {
-		host = "https://index.docker.io/v1/"
+	if registry == "" {
+		registry = "https://index.docker.io/v1/"
 	}
 
-	authConfig, err := cfg.GetAuthConfig(host)
+	authConfig, err := cfg.GetAuthConfig(registry)
 	if err != nil {
 		return "", fmt.Errorf("getting auth config: %w", err)
 	}
@@ -227,15 +196,15 @@ func getAuthForHost(host string) (string, error) {
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
-func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, sourceImages []ContainerImage) error {
-	for _, image := range sourceImages {
-		exists, err := imageExistsLocally(ctx, cli, image)
+func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, manifest ImageManifest) error {
+	for _, image := range manifest.Images {
+		exists, err := originImageExistsLocally(ctx, cli, image)
 		if err != nil {
 			return fmt.Errorf("checking local image: %w", err)
 		}
 
 		if exists {
-			logger.Printf("Image %s exists locally. Skipping ...", image.String())
+			logger.Printf("Image %s exists locally. Skipping ...", image.Origin())
 			continue
 		}
 
@@ -248,7 +217,7 @@ func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logge
 }
 
 func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	reader, err := cli.ImagePull(ctx, image.String(), types.ImagePullOptions{})
+	reader, err := cli.ImagePull(ctx, image.Origin(), types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("pulling image: %w", err)
 	}
@@ -262,8 +231,8 @@ func pullImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Clien
 }
 
 func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	return wait.PollImmediate(Interval, WaitTime, func() (bool, error) {
-		exists, err := imageExistsLocally(ctx, cli, image)
+	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		exists, err := originImageExistsLocally(ctx, cli, image)
 		if err != nil {
 			return false, fmt.Errorf("checking local image: %w", err)
 		}
@@ -273,38 +242,23 @@ func waitForImagePull(ctx context.Context, logger *log.Logger, cli *client.Clien
 	})
 }
 
-func imageExistsLocally(ctx context.Context, cli *client.Client, image ContainerImage) (bool, error) {
+func originImageExistsLocally(ctx context.Context, cli *client.Client, image ContainerImage) (bool, error) {
 	imageList, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("getting image list: %w", err)
 	}
 
-	if image.Host == "docker.io" {
-		image.Host = ""
+	if image.OriginRegistry == "docker.io" {
+		image.OriginRegistry = ""
 	}
 
 	for _, imageSummary := range imageList {
 		for _, repoTag := range imageSummary.RepoTags {
-			if repoTag == image.String() {
+			if repoTag == image.Origin() {
 				return true, nil
 			}
 		}
 	}
 
 	return false, nil
-}
-
-func getImageMap(sourceImages []ContainerImage, destinationImages []ContainerImage) map[ContainerImage]ContainerImage {
-	imageMap := make(map[ContainerImage]ContainerImage)
-
-	for _, sourceImage := range sourceImages {
-		for _, destinationImage := range destinationImages {
-			if strings.EqualFold(destinationImage.Repository, sourceImage.Repository) {
-				imageMap[sourceImage] = destinationImage
-				break
-			}
-		}
-	}
-
-	return imageMap
 }
