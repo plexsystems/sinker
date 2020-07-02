@@ -59,7 +59,7 @@ type ContainerImage struct {
 	Repository     string `json:"repository"`
 	Version        string `json:"version"`
 	OriginRegistry string `json:"origin,omitempty"`
-	Auth           Auth   `json:"auth,omitempty"`
+	Auth           *Auth  `json:"auth,omitempty"`
 }
 
 // Auth is a username and password to log into the registry
