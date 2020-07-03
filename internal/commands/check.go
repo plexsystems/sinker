@@ -1,12 +1,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
-	"strings"
-	"unicode"
 
-	"github.com/hashicorp/go-version"
-	"github.com/heroku/docker-registry-client/registry"
+	"github.com/docker/docker/api/types"
+	"github.com/genuinetools/reg/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +15,9 @@ func newCheckCommand() *cobra.Command {
 		Short: "Check for newer images in the remote registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runCheckCommand("."); err != nil {
+			ctx := context.Background()
+
+			if err := runCheckCommand(ctx, "."); err != nil {
 				return fmt.Errorf("run check: %w", err)
 			}
 
@@ -27,74 +28,33 @@ func newCheckCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(path string) error {
-	imageManifest, err := getManifest(path)
+func runCheckCommand(ctx context.Context, path string) error {
+	dockerAuth, err := newRegistryAuth("https://index.docker.io")
 	if err != nil {
-		return fmt.Errorf("get images from file: %w", err)
+		return fmt.Errorf("new registry auth: %w", err)
 	}
 
-	api, err := registry.New("https://registry-1.docker.io/", "", "")
+	dockerAuthConfig := types.AuthConfig{
+		Username: dockerAuth.Username,
+		Password: dockerAuth.Password,
+	}
+
+	dockerOpts := registry.Opt{
+		Insecure: true,
+		Domain:   "https://index.docker.io",
+	}
+
+	dockerRegistry, err := registry.New(ctx, dockerAuthConfig, dockerOpts)
 	if err != nil {
-		return fmt.Errorf("new registry client: %w", err)
+		return fmt.Errorf("new registry: %w", err)
 	}
-	api.Logf = registry.Quiet
 
-	for _, image := range imageManifest.Images {
-		var newerVersions []string
-
-		if image.OriginRegistry == "quay.io" {
-			fmt.Printf("Image %s has quay.io address, skipping...\n", image)
-			continue
-		}
-
-		sourceTag, err := version.NewVersion(image.Version)
-		if err != nil {
-			fmt.Printf("skipping %v: %v\n", image, err)
-			continue
-		}
-
-		var searchRepo string
-		if !strings.Contains(image.Repository, "/") {
-			searchRepo = "library/" + image.Repository
-		} else {
-			searchRepo = image.Repository
-		}
-
-		allTags, err := api.Tags(searchRepo)
-		if err != nil {
-			return fmt.Errorf("getting tags: %w", err)
-		}
-
-		allTags = removeLatestTags(allTags)
-		for _, tag := range allTags {
-			upstreamTag, err := version.NewVersion(tag)
-			if err != nil {
-				fmt.Printf("skipping %v: %v\n", image, err)
-				continue
-			}
-
-			if sourceTag.LessThan(upstreamTag) {
-				newerVersions = append(newerVersions, upstreamTag.Original())
-			}
-		}
-
-		if len(newerVersions) > 0 {
-			fmt.Printf("New versions for %v found: %v\n", image, newerVersions)
-		} else {
-			fmt.Printf("%v is up to date!\n", image)
-		}
+	dockerTags, err := dockerRegistry.Tags(ctx, "library/nginx")
+	if err != nil {
+		return fmt.Errorf("fetch tags: %w", err)
 	}
+
+	fmt.Println(dockerTags)
 
 	return nil
-}
-
-func removeLatestTags(tags []string) []string {
-	var tagsWithoutLatest []string
-	for _, tag := range tags {
-		if unicode.IsDigit([]rune(tag)[0]) || strings.HasPrefix(tag, "v") {
-			tagsWithoutLatest = append(tagsWithoutLatest, tag)
-		}
-	}
-
-	return tagsWithoutLatest
 }

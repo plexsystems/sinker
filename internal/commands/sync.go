@@ -21,6 +21,46 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// RegistryAuth contains authorization information for connecting to a Registry
+type RegistryAuth struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Encoded  string `json:"auth,omitempty"`
+}
+
+func newRegistryAuth(registry string) (RegistryAuth, error) {
+	cfg, err := config.Load(config.Dir())
+	if err != nil {
+		return RegistryAuth{}, fmt.Errorf("loading docker config: %w", err)
+	}
+
+	if !cfg.ContainsAuth() {
+		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
+	}
+
+	authConfig, err := cfg.GetAuthConfig(registry)
+	if err != nil {
+		return RegistryAuth{}, fmt.Errorf("getting auth config: %w", err)
+	}
+
+	jsonAuth, err := json.Marshal(authConfig)
+	if err != nil {
+		return RegistryAuth{}, fmt.Errorf("marshal auth: %w", err)
+	}
+
+	if authConfig.Auth == "" {
+		authConfig.Auth = base64.URLEncoding.EncodeToString(jsonAuth)
+	}
+
+	registryAuth := RegistryAuth{
+		Username: authConfig.Username,
+		Password: authConfig.Password,
+		Encoded:  authConfig.Auth,
+	}
+
+	return registryAuth, nil
+}
+
 func newSyncCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "sync",
@@ -85,13 +125,13 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 }
 
 func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, mirror Mirror) (bool, error) {
-	auth, err := getRegistryAuthFromConfig(mirror.Registry)
+	registryAuth, err := newRegistryAuth(mirror.Registry)
 	if err != nil {
 		return false, fmt.Errorf("get auth for origin: %w", err)
 	}
 
 	_, err = cli.ImagePull(ctx, mirror.String()+"/"+image.String(), types.ImagePullOptions{
-		RegistryAuth: auth,
+		RegistryAuth: registryAuth.Encoded,
 	})
 
 	var notFoundError errdefs.ErrNotFound
@@ -105,13 +145,13 @@ func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, ima
 }
 
 func pushImageToMirrorAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror) error {
-	auth, err := getRegistryAuthFromConfig(mirror.Registry)
+	registryAuth, err := newRegistryAuth(mirror.Registry)
 	if err != nil {
 		return fmt.Errorf("get auth for origin: %w", err)
 	}
 
 	reader, err := cli.ImagePush(ctx, mirror.String()+"/"+image.String(), types.ImagePushOptions{
-		RegistryAuth: auth,
+		RegistryAuth: registryAuth.Encoded,
 	})
 	if err != nil {
 		return fmt.Errorf("pushing image: %w", err)
@@ -178,55 +218,37 @@ func getOriginRegistryAuth(image ContainerImage) (string, error) {
 		username := os.Getenv(image.Auth.Username)
 		password := os.Getenv(image.Auth.Password)
 
-		authConfig := types.AuthConfig{
+		registryAuth := RegistryAuth{
 			Username: username,
 			Password: password,
 		}
 
-		jsonAuth, err := json.Marshal(authConfig)
+		jsonRegistryAuth, err := json.Marshal(registryAuth)
 		if err != nil {
 			return "", fmt.Errorf("marshal auth: %w", err)
 		}
 
-		return base64.StdEncoding.EncodeToString(jsonAuth), nil
+		return base64.StdEncoding.EncodeToString(jsonRegistryAuth), nil
 	}
 
 	var registry string
 	if image.OriginRegistry == "" {
-		registry = "https://index.docker.io/v1/"
+		registry = "https://index.docker.io/v2/"
 	} else {
 		registry = image.OriginRegistry
 	}
 
-	auth, err := getRegistryAuthFromConfig(registry)
+	registryAuth, err := newRegistryAuth(registry)
 	if err != nil {
 		return "", fmt.Errorf("get auth from config: %w", err)
 	}
 
-	return auth, nil
-}
-
-func getRegistryAuthFromConfig(registry string) (string, error) {
-	cfg, err := config.Load(config.Dir())
+	jsonRegistryAuth, err := json.Marshal(registryAuth)
 	if err != nil {
-		return "", fmt.Errorf("loading docker config: %w", err)
+		return "", fmt.Errorf("marshal auth: %w", err)
 	}
 
-	if !cfg.ContainsAuth() {
-		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
-	}
-
-	authConfig, err := cfg.GetAuthConfig(registry)
-	if err != nil {
-		return "", fmt.Errorf("getting auth config: %w", err)
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
+	return base64.StdEncoding.EncodeToString(jsonRegistryAuth), nil
 }
 
 func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logger, manifest ImageManifest) error {
@@ -279,7 +301,7 @@ func waitForOriginImagePull(ctx context.Context, logger *log.Logger, cli *client
 			return false, fmt.Errorf("checking local image: %w", err)
 		}
 
-		logger.Printf("Pulling %s ...\n", image)
+		logger.Printf("Pulling %s ...\n", image.Origin())
 		return exists, nil
 	})
 }

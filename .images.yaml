@@ -35,9 +35,6 @@ images:
   - repository: twistlock/defender
     version: defender_20_04_177
     origin: registry.twistlock.com
-    auth:
-        username: MY_USER
-        password: MY_PASSWORD
   - repository: jettech/kube-webhook-certgen
     version: v1.2.0
     origin: docker.io
