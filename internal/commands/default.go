@@ -24,7 +24,7 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.AddCommand(newCreateCommand())
 	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newPushCommand(ctx, logger))
-	cmd.AddCommand(newCheckCommand(ctx))
+	cmd.AddCommand(newCheckCommand(ctx, logger))
 
 	return &cmd
 }
