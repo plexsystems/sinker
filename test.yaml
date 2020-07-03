@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -18713,95 +18714,6 @@ spec:
           requests:
             cpu: 100m
             memory: 10Mi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    app.plex.dev/pcp-version: v1.1.0
-  labels:
-    app.kubernetes.io/instance: gatekeeper
-    app.kubernetes.io/name: gatekeeper
-    control-plane: controller-manager
-    gatekeeper.sh/operation: audit
-    gatekeeper.sh/system: "yes"
-  name: gatekeeper-audit
-  namespace: gatekeeper-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: gatekeeper
-      app.kubernetes.io/name: gatekeeper
-      control-plane: audit-controller
-      gatekeeper.sh/operation: audit
-      gatekeeper.sh/system: "yes"
-  template:
-    metadata:
-      annotations:
-        app.plex.dev/pcp-version: v1.1.0
-        container.seccomp.security.alpha.kubernetes.io/manager: runtime/default
-      labels:
-        app.kubernetes.io/instance: gatekeeper
-        app.kubernetes.io/name: gatekeeper
-        control-plane: audit-controller
-        gatekeeper.sh/operation: audit
-        gatekeeper.sh/system: "yes"
-    spec:
-      containers:
-      - args:
-        - --operation=audit
-        - --operation=status
-        - --logtostderr
-        command:
-        - /manager
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        image: plexdev.azurecr.io/pcp/openpolicyagent/gatekeeper:v3.1.0-beta.10
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 9090
-        name: auditcontainer
-        ports:
-        - containerPort: 8888
-          name: metrics
-          protocol: TCP
-        - containerPort: 9090
-          name: healthz
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 9090
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 512Mi
-          requests:
-            cpu: 100m
-            memory: 256Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - all
-          runAsGroup: 999
-          runAsNonRoot: true
-          runAsUser: 1000
-      nodeSelector:
-        kubernetes.io/os: linux
-      serviceAccountName: gatekeeper-admin
-      terminationGracePeriodSeconds: 60
 ---
 apiVersion: apps/v1
 kind: Deployment

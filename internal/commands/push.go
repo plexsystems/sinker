@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"time"
 
 	"github.com/docker/cli/cli/config"
@@ -20,46 +19,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
-
-// RegistryAuth contains authorization information for connecting to a Registry
-type RegistryAuth struct {
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-}
-
-// Encode encodes the credentials using Base64
-func (r RegistryAuth) Encode() (string, error) {
-	jsonAuth, err := json.Marshal(r)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
-
-}
-
-func newRegistryAuth(registry string) (RegistryAuth, error) {
-	cfg, err := config.Load(config.Dir())
-	if err != nil {
-		return RegistryAuth{}, fmt.Errorf("load docker config: %w", err)
-	}
-
-	if !cfg.ContainsAuth() {
-		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
-	}
-
-	authConfig, err := cfg.GetAuthConfig(registry)
-	if err != nil {
-		return RegistryAuth{}, fmt.Errorf("get auth config: %w", err)
-	}
-
-	registryAuth := RegistryAuth{
-		Username: authConfig.Username,
-		Password: authConfig.Password,
-	}
-
-	return registryAuth, nil
-}
 
 func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
@@ -128,14 +87,9 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 }
 
 func targetImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, target Target) (bool, error) {
-	registryAuth, err := newRegistryAuth(target.Registry)
+	encodedAuth, err := getEncodedAuthForImage(image, "")
 	if err != nil {
-		return false, fmt.Errorf("get auth for origin: %w", err)
-	}
-
-	encodedAuth, err := registryAuth.Encode()
-	if err != nil {
-		return false, fmt.Errorf("encoding auth: %w", err)
+		return false, fmt.Errorf("get encoded auth: %w", err)
 	}
 
 	_, err = cli.ImagePull(ctx, target.String()+"/"+image.String(), types.ImagePullOptions{
@@ -153,14 +107,9 @@ func targetImageExistsAtRemote(ctx context.Context, cli *client.Client, image Co
 }
 
 func pushImageToTargetAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, target Target) error {
-	registryAuth, err := newRegistryAuth(target.Registry)
+	encodedAuth, err := getEncodedAuthForImage(image, "")
 	if err != nil {
-		return fmt.Errorf("get auth for origin: %w", err)
-	}
-
-	encodedAuth, err := registryAuth.Encode()
-	if err != nil {
-		return fmt.Errorf("encoding auth: %w", err)
+		return fmt.Errorf("get encoded auth: %w", err)
 	}
 
 	reader, err := cli.ImagePush(ctx, target.String()+"/"+image.String(), types.ImagePushOptions{
@@ -226,42 +175,31 @@ func waitForTargetImagePushed(ctx context.Context, logger *log.Logger, cli *clie
 	})
 }
 
-func getSourceRegistryAuth(image ContainerImage) (string, error) {
-	if image.Auth.Password != "" {
-		username := os.Getenv(image.Auth.Username)
-		password := os.Getenv(image.Auth.Password)
-
-		registryAuth := RegistryAuth{
-			Username: username,
-			Password: password,
-		}
-
-		encodedAuth, err := registryAuth.Encode()
-		if err != nil {
-			return "", fmt.Errorf("encoding auth: %w", err)
-		}
-
-		return encodedAuth, nil
-	}
-
-	var registry string
-	if image.SourceRegistry == "" {
+func getEncodedAuthForImage(image ContainerImage, registry string) (string, error) {
+	if registry == "" {
 		registry = "https://index.docker.io/v2/"
-	} else {
-		registry = image.SourceRegistry
 	}
 
-	registryAuth, err := newRegistryAuth(registry)
+	cfg, err := config.Load(config.Dir())
 	if err != nil {
-		return "", fmt.Errorf("get auth from config: %w", err)
+		return "", fmt.Errorf("loading docker config: %w", err)
 	}
 
-	encodedAuth, err := registryAuth.Encode()
+	if !cfg.ContainsAuth() {
+		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
+	}
+
+	authConfig, err := cfg.GetAuthConfig(registry)
 	if err != nil {
-		return "", fmt.Errorf("encoding auth: %w", err)
+		return "", fmt.Errorf("getting auth config: %w", err)
 	}
 
-	return encodedAuth, nil
+	jsonAuth, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", fmt.Errorf("marshal auth: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
 func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, manifest ImageManifest) error {
@@ -285,13 +223,13 @@ func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logge
 }
 
 func pullSourceImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	auth, err := getSourceRegistryAuth(image)
+	encodedAuth, err := getEncodedAuthForImage(image, "")
 	if err != nil {
-		return fmt.Errorf("get source auth: %w", err)
+		return fmt.Errorf("get encoded auth: %w", err)
 	}
 
 	opts := types.ImagePullOptions{
-		RegistryAuth: auth,
+		RegistryAuth: encodedAuth,
 	}
 
 	reader, err := cli.ImagePull(ctx, image.Source(), opts)

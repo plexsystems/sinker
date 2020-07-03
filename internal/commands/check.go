@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types"
-	"github.com/genuinetools/reg/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -26,33 +24,33 @@ func newCheckCommand(ctx context.Context) *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(ctx context.Context, path string) error {
-	dockerAuth, err := newRegistryAuth("https://index.docker.io")
-	if err != nil {
-		return fmt.Errorf("new registry auth: %w", err)
-	}
+func runCheckCommand(ctx context.Context, path string) error { /*
+		dockerAuth, err := newRegistryAuth("https://index.docker.io")
+		if err != nil {
+			return fmt.Errorf("new registry auth: %w", err)
+		}
 
-	dockerAuthConfig := types.AuthConfig{
-		Username: dockerAuth.Username,
-		Password: dockerAuth.Password,
-	}
+		dockerAuthConfig := types.AuthConfig{
+			Username: dockerAuth.Username,
+			Password: dockerAuth.Password,
+		}
 
-	dockerOpts := registry.Opt{
-		Insecure: true,
-		Domain:   "https://index.docker.io",
-	}
+		dockerOpts := registry.Opt{
+			Insecure: true,
+			Domain:   "https://index.docker.io",
+		}
 
-	dockerRegistry, err := registry.New(ctx, dockerAuthConfig, dockerOpts)
-	if err != nil {
-		return fmt.Errorf("new registry: %w", err)
-	}
+		dockerRegistry, err := registry.New(ctx, dockerAuthConfig, dockerOpts)
+		if err != nil {
+			return fmt.Errorf("new registry: %w", err)
+		}
 
-	dockerTags, err := dockerRegistry.Tags(ctx, "library/nginx")
-	if err != nil {
-		return fmt.Errorf("fetch tags: %w", err)
-	}
+		dockerTags, err := dockerRegistry.Tags(ctx, "library/nginx")
+		if err != nil {
+			return fmt.Errorf("fetch tags: %w", err)
+		}
 
-	fmt.Println(dockerTags)
+		fmt.Println(dockerTags)*/
 
 	return nil
 }

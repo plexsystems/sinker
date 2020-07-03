@@ -1,45 +1,49 @@
 target:
-    registry: lol.com
+    registry: plexdev.azurecr.io
+    repository: pcp
 images:
-  - repository: pcp/nginx
+  - repository: nginx
     version: 1.14.2
     source: docker.io
-  - repository: pcp/openpolicyagent/gatekeeper
+  - repository: openpolicyagent/gatekeeper
     version: v3.1.0-beta.10
     source: docker.io
-  - repository: pcp/kubernetes-ingress-controller/nginx-ingress-controller
+  - repository: kubernetes-ingress-controller/nginx-ingress-controller
     version: 0.32.0
     source: quay.io
-  - repository: pcp/coreos/kube-state-metrics
+  - repository: coreos/kube-state-metrics
     version: v1.9.5
     source: quay.io
-  - repository: pcp/coreos/prometheus-operator
+  - repository: coreos/prometheus-operator
     version: v0.40.0
     source: quay.io
-  - repository: pcp/jimmidyson/configmap-reload
+  - repository: jimmidyson/configmap-reload
     version: v0.3.0
     source: docker.io
-  - repository: pcp/coreos/prometheus-config-reloader
+  - repository: coreos/prometheus-config-reloader
     version: v0.40.0
     source: quay.io
-  - repository: pcp/consul
+  - repository: consul
     version: 1.7.2
     source: docker.io
-  - repository: pcp/prom/node-exporter
+  - repository: prom/node-exporter
     version: v0.18.1
     source: docker.io
-  - repository: pcp/grafana/promtail
+  - repository: grafana/promtail
     version: v0.4.0
     source: docker.io
-  - repository: pcp/twistlock/defender
+  - repository: twistlock/defender
     version: defender_20_04_177
     source: registry.twistlock.com
-  - repository: pcp/jettech/kube-webhook-certgen
+    auth:
+        username: MY_USER
+        password: MY_PASSWORD
+  - repository: jettech/kube-webhook-certgen
     version: v1.2.0
     source: docker.io
-  - repository: pcp/prom/alertmanager
+  - repository: prom/alertmanager
     version: v0.21.0
     source: docker.io
-  - repository: pcp/prom/prometheus
+  - repository: prom/prometheus
     version: v2.19.2
     source: docker.io
