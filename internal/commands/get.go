@@ -10,9 +10,10 @@ import (
 	"strings"
 
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/ghodss/yaml"
+	manyaml "github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,14 +22,14 @@ const manifestFileName = ".images.yaml"
 
 // ImageManifest is a collection of images to mirror
 type ImageManifest struct {
-	Mirror Mirror           `json:"mirror"`
-	Images []ContainerImage `json:"images"`
+	Mirror Mirror           `yaml:"mirror"`
+	Images []ContainerImage `yaml:"images"`
 }
 
 // Mirror is the registry and repository to mirror images to
 type Mirror struct {
-	Registry   string `json:"registry"`
-	Repository string `json:"repository,omitempty"`
+	Registry   string `yaml:"registry"`
+	Repository string `yaml:"repository,omitempty"`
 }
 
 func newMirror(mirrorLocation string) Mirror {
@@ -56,16 +57,16 @@ func (m Mirror) String() string {
 
 // ContainerImage is a container image found in a repository
 type ContainerImage struct {
-	Repository     string `json:"repository"`
-	Version        string `json:"version"`
-	OriginRegistry string `json:"origin,omitempty"`
-	Auth           *Auth  `json:"auth,omitempty"`
+	Repository     string `yaml:"repository"`
+	Version        string `yaml:"version"`
+	OriginRegistry string `yaml:"origin,omitempty"`
+	Auth           Auth   `yaml:"auth,omitempty"`
 }
 
 // Auth is a username and password to log into the registry
 type Auth struct {
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 func (c ContainerImage) String() string {
@@ -166,13 +167,13 @@ func getFromKubernetesManifests(path string, mirror Mirror) ([]ContainerImage, e
 	var imageList []string
 	for _, yamlFile := range yamlFiles {
 		var typeMeta metav1.TypeMeta
-		if err := yaml.Unmarshal(yamlFile, &typeMeta); err != nil {
+		if err := manyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
 			continue
 		}
 
 		if typeMeta.Kind == "Prometheus" {
 			var prometheus promv1.Prometheus
-			if err := yaml.Unmarshal(yamlFile, &prometheus); err != nil {
+			if err := manyaml.Unmarshal(yamlFile, &prometheus); err != nil {
 				return nil, fmt.Errorf("unmarshal prometheus: %w", err)
 			}
 
@@ -197,7 +198,7 @@ func getFromKubernetesManifests(path string, mirror Mirror) ([]ContainerImage, e
 
 		if typeMeta.Kind == "Alertmanager" {
 			var alertmanager promv1.Alertmanager
-			if err := yaml.Unmarshal(yamlFile, &alertmanager); err != nil {
+			if err := manyaml.Unmarshal(yamlFile, &alertmanager); err != nil {
 				return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
 			}
 
@@ -229,7 +230,7 @@ func getFromKubernetesManifests(path string, mirror Mirror) ([]ContainerImage, e
 		}
 
 		var contents BaseType
-		if err := yaml.Unmarshal(yamlFile, &contents); err != nil {
+		if err := manyaml.Unmarshal(yamlFile, &contents); err != nil {
 			continue
 		}
 

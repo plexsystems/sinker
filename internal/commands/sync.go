@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/docker/cli/cli/config"
@@ -58,19 +59,14 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	logger.Printf("Tagging images ...")
 	for _, image := range currentManifest.Images {
-		logger.Printf("Tagging image %s -> %s ...", image.Origin(), image.String())
-		if err := cli.ImageTag(ctx, image.Origin(), image.String()); err != nil {
+		logger.Printf("Tagging image %s -> %s ...", image.Origin(), currentManifest.Mirror.String()+"/"+image.String())
+		if err := cli.ImageTag(ctx, image.Origin(), currentManifest.Mirror.String()+"/"+image.String()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
 	for _, image := range currentManifest.Images {
-		auth, err := getAuthForOriginRegistry(image.OriginRegistry)
-		if err != nil {
-			return fmt.Errorf("getting auth: %w", err)
-		}
-
-		imageExists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, currentManifest.Mirror, auth)
+		imageExists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, currentManifest.Mirror)
 		if err != nil {
 			return fmt.Errorf("checking image exists: %w", err)
 		}
@@ -80,7 +76,7 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 			continue
 		}
 
-		if err := pushImageToMirrorAndWait(ctx, logger, cli, image, currentManifest.Mirror, auth); err != nil {
+		if err := pushImageToMirrorAndWait(ctx, logger, cli, image, currentManifest.Mirror); err != nil {
 			return fmt.Errorf("pushing image to remote: %w", err)
 		}
 	}
@@ -88,8 +84,13 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 	return nil
 }
 
-func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, mirror Mirror, auth string) (bool, error) {
-	_, err := cli.ImagePull(ctx, image.String(), types.ImagePullOptions{
+func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, mirror Mirror) (bool, error) {
+	auth, err := getRegistryAuthFromConfig(mirror.Registry)
+	if err != nil {
+		return false, fmt.Errorf("get auth for origin: %w", err)
+	}
+
+	_, err = cli.ImagePull(ctx, mirror.String()+"/"+image.String(), types.ImagePullOptions{
 		RegistryAuth: auth,
 	})
 
@@ -97,15 +98,19 @@ func checkMirrorImageExistsAtRemote(ctx context.Context, cli *client.Client, ima
 	if errors.As(err, &notFoundError) {
 		return false, nil
 	} else if err != nil {
-		return false, fmt.Errorf("pulling image for existance: %w", err)
+		return false, fmt.Errorf("check image for existance: %w", err)
 	}
 
 	return true, nil
 }
 
-func pushImageToMirrorAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror, auth string) error {
-	pushDestination := mirror.String() + image.String()
-	reader, err := cli.ImagePush(ctx, pushDestination, types.ImagePushOptions{
+func pushImageToMirrorAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror) error {
+	auth, err := getRegistryAuthFromConfig(mirror.Registry)
+	if err != nil {
+		return fmt.Errorf("get auth for origin: %w", err)
+	}
+
+	reader, err := cli.ImagePush(ctx, mirror.String()+"/"+image.String(), types.ImagePushOptions{
 		RegistryAuth: auth,
 	})
 	if err != nil {
@@ -149,26 +154,59 @@ func pushImageToMirrorAndWait(ctx context.Context, logger *log.Logger, cli *clie
 		}
 	}
 
-	if err := waitForMirrorImagePush(ctx, logger, cli, image, mirror, auth); err != nil {
+	if err := waitForMirrorImagePush(ctx, logger, cli, image, mirror); err != nil {
 		return fmt.Errorf("waiting for push: %w", err)
 	}
 
 	return nil
 }
 
-func waitForMirrorImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror, auth string) error {
+func waitForMirrorImagePush(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, mirror Mirror) error {
 	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
-		exists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, mirror, auth)
+		exists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, mirror)
 		if err != nil {
 			return false, fmt.Errorf("checking remote image: %w", err)
 		}
 
-		logger.Printf("Pushing %s ...\n", image)
+		logger.Printf("Pushing %s ...\n", mirror.String()+"/"+image.String())
 		return exists, nil
 	})
 }
 
-func getAuthForOriginRegistry(registry string) (string, error) {
+func getOriginRegistryAuth(image ContainerImage) (string, error) {
+	if image.Auth.Password != "" {
+		username := os.Getenv(image.Auth.Username)
+		password := os.Getenv(image.Auth.Password)
+
+		authConfig := types.AuthConfig{
+			Username: username,
+			Password: password,
+		}
+
+		jsonAuth, err := json.Marshal(authConfig)
+		if err != nil {
+			return "", fmt.Errorf("marshal auth: %w", err)
+		}
+
+		return base64.StdEncoding.EncodeToString(jsonAuth), nil
+	}
+
+	var registry string
+	if image.OriginRegistry == "" {
+		registry = "https://index.docker.io/v1/"
+	} else {
+		registry = image.OriginRegistry
+	}
+
+	auth, err := getRegistryAuthFromConfig(registry)
+	if err != nil {
+		return "", fmt.Errorf("get auth from config: %w", err)
+	}
+
+	return auth, nil
+}
+
+func getRegistryAuthFromConfig(registry string) (string, error) {
 	cfg, err := config.Load(config.Dir())
 	if err != nil {
 		return "", fmt.Errorf("loading docker config: %w", err)
@@ -176,10 +214,6 @@ func getAuthForOriginRegistry(registry string) (string, error) {
 
 	if !cfg.ContainsAuth() {
 		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
-	}
-
-	if registry == "" {
-		registry = "https://index.docker.io/v1/"
 	}
 
 	authConfig, err := cfg.GetAuthConfig(registry)
@@ -208,7 +242,7 @@ func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logge
 		}
 
 		if err := pullOriginImageAndWait(ctx, logger, cli, image); err != nil {
-			return fmt.Errorf("pulling image: %w", err)
+			return fmt.Errorf("waiting for image pull: %w", err)
 		}
 	}
 
@@ -216,7 +250,16 @@ func pullOriginImages(ctx context.Context, cli *client.Client, logger *log.Logge
 }
 
 func pullOriginImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	reader, err := cli.ImagePull(ctx, image.Origin(), types.ImagePullOptions{})
+	auth, err := getOriginRegistryAuth(image)
+	if err != nil {
+		return fmt.Errorf("get auth for origin: %w", err)
+	}
+
+	opts := types.ImagePullOptions{
+		RegistryAuth: auth,
+	}
+
+	reader, err := cli.ImagePull(ctx, image.Origin(), opts)
 	if err != nil {
 		return fmt.Errorf("pulling image: %w", err)
 	}
