@@ -9,14 +9,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCheckCommand() *cobra.Command {
+func newCheckCommand(ctx context.Context) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the remote registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-
 			if err := runCheckCommand(ctx, "."); err != nil {
 				return fmt.Errorf("run check: %w", err)
 			}
