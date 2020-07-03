@@ -59,7 +59,7 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	logger.Printf("Tagging images ...")
 	for _, image := range currentManifest.Images {
-		logger.Printf("Tagging image %s -> %s ...", image.Origin(), currentManifest.Mirror.String()+"/"+image.String())
+		logger.Printf("Tagging %s -> %s", image.Origin(), currentManifest.Mirror.String()+"/"+image.String())
 		if err := cli.ImageTag(ctx, image.Origin(), currentManifest.Mirror.String()+"/"+image.String()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
@@ -72,12 +72,12 @@ func runSyncCommand(ctx context.Context, logger *log.Logger, path string) error 
 		}
 
 		if imageExists {
-			logger.Printf("Image %s exists at remote registry. Skipping ...", image.String())
+			logger.Printf("Image %s exists at mirror. Skipping ...", currentManifest.Mirror.Repository+"/"+image.String())
 			continue
 		}
 
 		if err := pushImageToMirrorAndWait(ctx, logger, cli, image, currentManifest.Mirror); err != nil {
-			return fmt.Errorf("pushing image to remote: %w", err)
+			return fmt.Errorf("pushing image to mirror: %w", err)
 		}
 	}
 
@@ -165,7 +165,7 @@ func waitForMirrorImagePush(ctx context.Context, logger *log.Logger, cli *client
 	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
 		exists, err := checkMirrorImageExistsAtRemote(ctx, cli, image, mirror)
 		if err != nil {
-			return false, fmt.Errorf("checking remote image: %w", err)
+			return false, fmt.Errorf("checking mirror image: %w", err)
 		}
 
 		logger.Printf("Pushing %s ...\n", mirror.String()+"/"+image.String())
@@ -223,7 +223,7 @@ func getRegistryAuthFromConfig(registry string) (string, error) {
 
 	jsonAuth, err := json.Marshal(authConfig)
 	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
+		return "", fmt.Errorf("marshal: %w", err)
 	}
 
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil

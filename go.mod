@@ -7,7 +7,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
 	github.com/coreos/prometheus-operator v0.39.0
 	github.com/docker/cli v0.0.0-20200130152716-5d0cf8839492
-	github.com/docker/distribution v0.0.0-20191008191456-ae2e973db936 // indirect
+	github.com/docker/distribution v0.0.0-20191008191456-ae2e973db936
 	github.com/docker/docker v0.7.3-0.20190826074503-38ab9da00309
 	github.com/docker/docker-credential-helpers v0.6.3 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect

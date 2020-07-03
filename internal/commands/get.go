@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/docker/distribution/reference"
 	manyaml "github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -239,55 +240,57 @@ func getFromKubernetesManifests(path string, mirror Mirror) ([]ContainerImage, e
 	}
 
 	dedupedImageList := dedupeImages(imageList)
-	marshaledImages := marshalImages(dedupedImageList, mirror)
+	marshalledImages, err := marshalImages(dedupedImageList, mirror)
+	if err != nil {
+		return nil, fmt.Errorf("marshal images: %w", err)
+	}
 
-	return marshaledImages, nil
+	return marshalledImages, nil
 }
 
-func marshalImages(images []string, mirror Mirror) []ContainerImage {
+func marshalImages(images []string, mirror Mirror) ([]ContainerImage, error) {
 	var containerImages []ContainerImage
 	for _, image := range images {
-		imageTokens := strings.Split(image, ":")
-		imagePaths := strings.Split(imageTokens[0], "/")
-
-		var imageHost string
-		if strings.Contains(imagePaths[0], ".io") {
-			imageHost = imagePaths[0]
-		} else {
-			imageHost = ""
+		imageReference, err := reference.ParseNormalizedNamed(image)
+		if err != nil {
+			return nil, fmt.Errorf("parse image: %w", err)
 		}
+		imageReference = reference.TagNameOnly(imageReference)
 
-		var imageRepository string
-		if imageHost != "" {
-			imageRepository = strings.TrimPrefix(imageTokens[0], imageHost+"/")
-		} else {
-			imageRepository = imageTokens[0]
-		}
+		imageRepository := reference.Path(imageReference)
 		imageRepository = strings.Replace(imageRepository, mirror.Repository+"/", "", 1)
 
-		repositoryMappings := map[string]string{
-			"kubernetes-ingress-controller": "quay.io",
-			"coreos":                        "quay.io",
-			"twistlock":                     "registry.twistlock.com",
-		}
+		imageVersion := strings.Split(imageReference.String(), ":")[1]
 
-		originRegistry := "docker.io"
-		for repository, registry := range repositoryMappings {
-			if strings.Contains(imageRepository, repository) {
-				originRegistry = registry
-			}
-		}
+		originRegistry := getOriginRegistryFromRepository(imageRepository)
 
 		containerImage := ContainerImage{
 			Repository:     imageRepository,
-			Version:        imageTokens[1],
+			Version:        imageVersion,
 			OriginRegistry: originRegistry,
 		}
 
 		containerImages = append(containerImages, containerImage)
 	}
 
-	return containerImages
+	return containerImages, nil
+}
+
+func getOriginRegistryFromRepository(repository string) string {
+	repositoryMappings := map[string]string{
+		"kubernetes-ingress-controller": "quay.io",
+		"coreos":                        "quay.io",
+		"twistlock":                     "registry.twistlock.com",
+	}
+
+	originRegistry := "docker.io"
+	for repositorySegment, registry := range repositoryMappings {
+		if strings.Contains(repository, repositorySegment) {
+			originRegistry = registry
+		}
+	}
+
+	return originRegistry
 }
 
 func writeManifest(imageManifest ImageManifest) error {
@@ -295,6 +298,7 @@ func writeManifest(imageManifest ImageManifest) error {
 	if err != nil {
 		return fmt.Errorf("marshal image manifest: %w", err)
 	}
+	imageManifestContents = bytes.ReplaceAll(imageManifestContents, []byte(`"`), []byte(""))
 
 	if err := ioutil.WriteFile(manifestFileName, imageManifestContents, os.ModePerm); err != nil {
 		return fmt.Errorf("creating file: %w", err)
