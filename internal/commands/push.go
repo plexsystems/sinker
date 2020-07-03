@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/docker/cli/cli/config"
@@ -87,7 +88,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 }
 
 func targetImageExistsAtRemote(ctx context.Context, cli *client.Client, image ContainerImage, target Target) (bool, error) {
-	encodedAuth, err := getEncodedAuthForImage(image, "")
+	encodedAuth, err := getEncodedAuthForRegistry(target.Registry)
 	if err != nil {
 		return false, fmt.Errorf("get encoded auth: %w", err)
 	}
@@ -107,7 +108,7 @@ func targetImageExistsAtRemote(ctx context.Context, cli *client.Client, image Co
 }
 
 func pushImageToTargetAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, target Target) error {
-	encodedAuth, err := getEncodedAuthForImage(image, "")
+	encodedAuth, err := getEncodedAuthForRegistry(target.Registry)
 	if err != nil {
 		return fmt.Errorf("get encoded auth: %w", err)
 	}
@@ -175,7 +176,7 @@ func waitForTargetImagePushed(ctx context.Context, logger *log.Logger, cli *clie
 	})
 }
 
-func getEncodedAuthForImage(image ContainerImage, registry string) (string, error) {
+func getEncodedAuthForRegistry(registry string) (string, error) {
 	if registry == "" {
 		registry = "https://index.docker.io/v2/"
 	}
@@ -192,6 +193,23 @@ func getEncodedAuthForImage(image ContainerImage, registry string) (string, erro
 	authConfig, err := cfg.GetAuthConfig(registry)
 	if err != nil {
 		return "", fmt.Errorf("getting auth config: %w", err)
+	}
+
+	jsonAuth, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", fmt.Errorf("marshal auth: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(jsonAuth), nil
+}
+
+func getEncodedImageAuth(image ContainerImage) (string, error) {
+	username := os.Getenv(image.Auth.Username)
+	password := os.Getenv(image.Auth.Password)
+
+	authConfig := Auth{
+		Username: username,
+		Password: password,
 	}
 
 	jsonAuth, err := json.Marshal(authConfig)
@@ -223,7 +241,13 @@ func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logge
 }
 
 func pullSourceImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	encodedAuth, err := getEncodedAuthForImage(image, "")
+	var encodedAuth string
+	var err error
+	if image.Auth.Password != "" {
+		encodedAuth, err = getEncodedImageAuth(image)
+	} else {
+		encodedAuth, err = getEncodedAuthForRegistry(image.SourceRegistry)
+	}
 	if err != nil {
 		return fmt.Errorf("get encoded auth: %w", err)
 	}
