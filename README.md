@@ -2,7 +2,7 @@
 
 `sinker` syncs container images from one registry to another. This is useful in cases where you need to have images that exist in a public container registry, in a private one.
 
-See the [example](../example) folder for more details on the produced files.
+See the [example](https://github.com/plexsystems/sinker/tree/main/example) folder for more details on the produced files.
 
 ## Installation
 
