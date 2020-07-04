@@ -1,109 +1,136 @@
-# imagesync
+# Sinker
 
-`imagesync` enables the syncing of container images from one container registry to another. This is useful in cases where you need to mirror images that exist in a public container registry, to a private one.
+`sinker` syncs container images from one registry to another. This is useful in cases where you need to have images that exist in a public container registry, in a private one.
 
-While this tool is not Kubernetes specific, currently the **list** command finds all Kubernetes manifests and extracts the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
-
-All other commands use the produced file from the `list` command. If you need to sync images that are not referenced in Kubernetes manifests, you can create your own images list:
-
-images.txt
-```text
-docker.io/grafana/promtail:v0.4.0
-docker.io/jettech/kube-webhook-certgen:v1.2.0
-docker.io/prom/alertmanager:v0.20.0
-docker.io/prom/prometheus:v2.18.1
-```
-
-## Examples
-
-### Container args
-
-```yaml
-...
-    spec:
-      containers:
-      - args:
-        - --logtostderr=true
-        - --config-reloader-image=jimmidyson/configmap-reload:v0.3.0
-        - --prometheus-config-reloader=quay.io/coreos/prometheus-config-reloader:v0.39.0
-```
-
-A list would be generated with both `configmap-reload` and `prometheus-config-reloader`.
-
-### Alertmanager
-
-```yaml
-kind: Alertmanager
-metadata:
-  name: main
-spec:
-  baseImage: prom/alertmanager
-  version: v0.20.0
-  replicas: 1
-  configSecret: alertmanager-main
-```
-
-A list would be generated with `prom/alertmanager:v0.20.0`
-
-```
-NOTE: This project is currently a work in progress.
-Feedback, feature requests, and contributions are welcome!
-```
+See the [example](../example) folder for more details on the produced files.
 
 ## Installation
 
-`GO111MODULE=on go get github.com/plexsystems/imagesync`
+`GO111MODULE=on go get github.com/plexsystems/sinker`
+
+Releases are also provided in the releases tab on GitHub.
+
+## The image manifest
+
+All commands either create, update, or read from the image manifest (`.images.yaml`). 
+
+While the `create` and `update` commands assist with managing the image manifest, the `push` command will not modify the image manifest. Allowing you to manually control the manifest if desired.
+
+### The target section
+
+```yaml
+target:
+    registry: mycompany.com
+    repository: myteam
+```
+
+The `target` section is where all of the images will be synced to. The above yaml would sync all images to the `mycompany` registry in the `myteam` repository: `mycompany.com/myteam/...`. 
+
+The `repository` field is optional.
+
+### The images section
+
+```yaml
+target:
+    registry: mycompany.com
+    repository: myteam
+images:
+  - repository: coreos/prometheus-operator
+    version: v0.40.0
+    source: quay.io
+  - repository: jimmidyson/configmap-reload
+    version: v0.3.1
+    source: docker.io
+  - repository: super/secret
+    version: v1.0.0
+    source: privatecompany.org
+    auth:
+        username: USER_ENVIRONMENT_VARIABLE_NAME
+        password: PASSWORD_ENVIRONMENT_VARIABLE_NAME
+```
+
+The images section includes the source registry and the repository for the image. During a sync, an image `push` would result in `mycompany.com/myteam/coreos/prometheus-operator:v0.40.0`
+
+#### Auth
+
+All auth is handled by looking at the clients Docker auth. If the client can perform a `docker push` or `docker pull`, sinker will be able to as well.
+
+In the event that an image that needs to be sync'd is in another registry, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This is useful in CI pipelines.
 
 ## Usage
 
-The `--mirror` flag tells `imagesync` the host, and optionally a repository path, of the mirror.
+All examples are taken from running commands in the `examples/` folder.
 
-For example, given an `images.txt` of the following:
+### Create command
 
-```text
-foourl.com/bar/nginxdemos/hello:0.2
-foourl.com/bar/alpine:3.11
-foourl.com/bar/coreos/prometheus-operator:v0.39.0
+Create an image manifest that includes a target registry and a collection of images that should be synced to the target.
+
+```
+$ sinker create --target mycompany.com/myteam
 ```
 
-Running the command:
+#### --target flag (required)
 
-```console
-$ imagesync sync images.txt --mirror foourl.com/bar
+Specifies the target registry (and optionally a repository) to sync the images to
+
+#### --autodetect flag (optional)
+
+While this tool is not Kubernetes specific, currently the `create` and `update` commands find all Kubernetes manifests and extracts the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
+
+```
+$ sinker create --target mycompany.com/myteam --autodetect
 ```
 
-Would remove `foourl.com/bar` from the images listed above and pull from `docker.io` behind the scenes.
-
-**NOTE:** Given that images are not always sourced from docker.io, some assumptions are made. Most notably, the `coreos/` repository will pull from `quay.io`
-
-This tool assumes that your images use the exact same repository path after the prefix. i.e. Assuming a `--mirror` value of `foourl.com/bar`:
-
-- `foourl.com/bar/nginxdemos/hello:0.2` will be sourced from `docker.io/nginxdemos/hello:0.2`
-
-- `foourl.com/bar/coreos/prometheus-operator:v0.39.0` will be sourced from `quay.io/coreos/prometheus-operator:v0.39.0`
-
-If no `--mirror` flag is used, the images will be read as is.
-
-### Listing images
-
-Print all image references found in Kubernetes manifests from a given folder or file. The `--output` flag writes the list to a file.
-
-```console
-$ imagesync list manifestsPath --output images.txt
+```yaml
+target:
+    registry: mycompany.com
+    repository: myteam
+images:
+  - repository: coreos/prometheus-operator
+    version: v0.40.0
+    source: quay.io
+  - repository: jimmidyson/configmap-reload
+    version: v0.3.1
+    source: docker.i
+  - repository: coreos/prometheus-config-reloader
+    version: v0.40.0
+    source: quay.io
 ```
 
-### Checking images
+#### Push command
 
-Checks if there are any newly published tags for the images.
+Push all of the images inside of the image manifest to the target registry.
 
-```console
-$ imagesync check images.txt --mirror foourl.com/bar/repo
+```
+$ sinker push
 ```
 
-### Syncing images
+#### --dryrun flag (optional)
 
-Sync all images in the image list to the mirror repository.
+The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
 
-```console
-$ imagesync sync images.txt --mirror foourl.com/bar/repo
+### Update command
+
 ```
+$ sinker update
+```
+
+Updates the current manifest to reflect new changes to Kubernetes manifests.
+
+_NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)_
+
+#### --target flag (optional)
+
+If desired, you can set a new target in the image manifest by using --target during an update.
+
+### List command
+
+```
+$ sinker list target
+```
+
+Prints a list of either the `source` or `target` images. This can be useful for piping into additional tooling that acts on image urls.
+
+#### --output flag (optional)
+
+Outputs the list to a file (e.g. `images.txt`)
