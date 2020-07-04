@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/plexsystems/imagesync/internal/commands"
+	"github.com/plexsystems/sinker/internal/commands"
 )
 
 func main() {

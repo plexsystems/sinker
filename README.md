@@ -91,7 +91,7 @@ images:
     source: quay.io
   - repository: jimmidyson/configmap-reload
     version: v0.3.1
-    source: docker.i
+    source: docker.io
   - repository: coreos/prometheus-config-reloader
     version: v0.40.0
     source: quay.io
