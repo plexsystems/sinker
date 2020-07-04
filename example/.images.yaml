@@ -1,0 +1,17 @@
+target:
+    registry: mycompany.com
+    repository: myteam
+images:
+  - repository: coreos/prometheus-operator
+    version: v0.40.0
+    source: quay.io
+  - repository: jimmidyson/configmap-reload
+    version: v0.3.1
+    source: docker.io
+    auth:
+      username: DOCKER_USER_ENV
+      password: DOCKER_PASSWORD_ENV
+  - repository: coreos/prometheus-config-reloader
+    version: v0.40.0
+    source: quay.io
+

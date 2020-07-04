@@ -1,123 +1,109 @@
 package commands
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"log"
 	"strings"
-	"unicode"
 
+	"github.com/docker/docker/api/types"
+	"github.com/genuinetools/reg/registry"
 	"github.com/hashicorp/go-version"
-	"github.com/heroku/docker-registry-client/registry"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-func newCheckCommand() *cobra.Command {
+func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
-		Short: "Check for newer images in the remote registry",
-		Args:  cobra.ExactArgs(1),
+		Short: "Check for newer images in the source registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("mirror", cmd.Flags().Lookup("mirror")); err != nil {
-				return fmt.Errorf("bind flag: %w", err)
-			}
-
-			if err := runCheckCommand(args); err != nil {
-				return fmt.Errorf("check: %w", err)
+			if err := runCheckCommand(ctx, logger, "."); err != nil {
+				return fmt.Errorf("run check: %w", err)
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringP("mirror", "m", "", "mirror prefix")
-
 	return &cmd
 }
 
-func runCheckCommand(args []string) error {
-	workingDir, err := os.Getwd()
+func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error {
+	dockerOpts := registry.Opt{
+		Insecure: true,
+		Domain:   "https://index.docker.io",
+	}
+
+	dockerRegistry, err := registry.New(ctx, types.AuthConfig{}, dockerOpts)
 	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
+		return fmt.Errorf("new registry: %w", err)
 	}
 
-	imageListPath := filepath.Join(workingDir, args[0])
-
-	mirrorImages, err := GetImagesFromFile(imageListPath)
+	manifest, err := getManifest(path)
 	if err != nil {
-		return fmt.Errorf("get images from file: %w", err)
+		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	var originalImages []ContainerImage
-	for _, mirrorImage := range mirrorImages {
-		originalImage := getOriginalImage(mirrorImage, viper.GetString("mirror"))
-		originalImages = append(originalImages, originalImage)
-	}
+	for _, image := range manifest.Images {
+		if image.SourceRegistry != "docker.io" {
+			logger.Printf("Image %s not sourced from docker.io. Skipping ...", image.Source())
+			continue
+		}
 
-	api, err := registry.New("https://registry-1.docker.io/", "", "")
-	if err != nil {
-		return fmt.Errorf("new registry client: %w", err)
-	}
-	api.Logf = registry.Quiet
+		imageVersion, err := version.NewVersion(image.Version)
+		if err != nil {
+			logger.Printf("Image %s weird versioning. Skipping ...", image.Source())
+			continue
+		}
 
-	for _, originalImage := range originalImages {
+		if !strings.Contains(image.Repository, "/") {
+			image.Repository = "library/" + image.Repository
+		}
+
+		imageTags, err := dockerRegistry.Tags(ctx, image.Repository)
+		if err != nil {
+			return fmt.Errorf("fetch tags: %w", err)
+		}
+		imageTags = filterTags(imageTags)
+
 		var newerVersions []string
-
-		if originalImage.Host == "quay.io" {
-			fmt.Printf("Image %s has quay.io address, skipping...\n", originalImage)
-			continue
-		}
-
-		sourceTag, err := version.NewVersion(originalImage.Version)
-		if err != nil {
-			fmt.Printf("skipping %v: %v\n", originalImage, err)
-			continue
-		}
-
-		var searchRepo string
-		if !strings.Contains(originalImage.Repository, "/") {
-			searchRepo = "library/" + originalImage.Repository
-		} else {
-			searchRepo = originalImage.Repository
-		}
-
-		allTags, err := api.Tags(searchRepo)
-		if err != nil {
-			return fmt.Errorf("getting tags: %w", err)
-		}
-
-		allTags = removeLatestTags(allTags)
-		for _, tag := range allTags {
+		for _, tag := range imageTags {
 			upstreamTag, err := version.NewVersion(tag)
 			if err != nil {
-				fmt.Printf("skipping %v: %v\n", originalImage, err)
+				logger.Printf("Tag %v was malformed. Skipping ...", upstreamTag)
 				continue
 			}
 
-			if sourceTag.LessThan(upstreamTag) {
+			if imageVersion.LessThan(upstreamTag) {
 				newerVersions = append(newerVersions, upstreamTag.Original())
 			}
 		}
 
+		if len(newerVersions) == 0 {
+			logger.Printf("Image %v is up to date!", image.Source())
+			continue
+		}
+
 		if len(newerVersions) > 0 {
-			fmt.Printf("New versions for %v found: %v\n", originalImage, newerVersions)
-		} else {
-			fmt.Printf("%v is up to date!\n", originalImage)
+			if len(newerVersions) > 5 {
+				newerVersions = newerVersions[len(newerVersions)-5:]
+			}
+
+			logger.Printf("New versions for %v found: %v", image.Source(), newerVersions)
 		}
 	}
 
 	return nil
 }
 
-func removeLatestTags(tags []string) []string {
-	var tagsWithoutLatest []string
+func filterTags(tags []string) []string {
+	var filteredTags []string
 	for _, tag := range tags {
-		if unicode.IsDigit([]rune(tag)[0]) || strings.HasPrefix(tag, "v") {
-			tagsWithoutLatest = append(tagsWithoutLatest, tag)
+		if strings.Contains(tag, ".") && !strings.Contains(tag, "-") {
+			filteredTags = append(filteredTags, tag)
 		}
 	}
 
-	return tagsWithoutLatest
+	return filteredTags
 }

@@ -1,0 +1,3 @@
+quay.io/coreos/prometheus-operator:v0.40.0
+docker.io/jimmidyson/configmap-reload:v0.3.0
+quay.io/coreos/prometheus-config-reloader:v0.40.0

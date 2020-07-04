@@ -1,0 +1,3 @@
+mycompany.com/myteam/coreos/prometheus-operator:v0.40.0
+mycompany.com/myteam/jimmidyson/configmap-reload:v0.3.0
+mycompany.com/myteam/coreos/prometheus-config-reloader:v0.40.0

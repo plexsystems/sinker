@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"log"
 	"os"
 	"path"
@@ -12,16 +13,19 @@ import (
 func NewDefaultCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:     path.Base(os.Args[0]),
-		Short:   "imagesync",
-		Long:    "A cli tool to sync docker images to another registry",
-		Version: "0.3.1",
+		Short:   "sinker",
+		Long:    "A CLI tool to sync container images to another registry",
+		Version: "0.5.0",
 	}
 
+	ctx := context.Background()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
+	cmd.AddCommand(newCreateCommand())
+	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newListCommand())
-	cmd.AddCommand(newSyncCommand(logger))
-	cmd.AddCommand(newCheckCommand())
+	cmd.AddCommand(newPushCommand(ctx, logger))
+	cmd.AddCommand(newCheckCommand(ctx, logger))
 
 	return &cmd
 }
