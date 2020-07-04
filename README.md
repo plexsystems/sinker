@@ -5,7 +5,7 @@
 
 ![logo](logo.png)
 
-`sinker` syncs container images from one registry to another. This is useful in cases where you need to have images that exist in a public container registry, in a private one.
+`sinker` syncs container images from one registry to another. This is useful in cases when you rely on images that exist in a public container registry, but need to pull from a private registry.
 
 See the [example](https://github.com/plexsystems/sinker/tree/main/example) folder for more details on the produced files.
 
@@ -13,7 +13,7 @@ See the [example](https://github.com/plexsystems/sinker/tree/main/example) folde
 
 `GO111MODULE=on go get github.com/plexsystems/sinker`
 
-Releases are also provided in the releases tab on GitHub.
+Releases are also provided in the [releases](https://github.com/plexsystems/sinker/releases) tab on GitHub.
 
 ## The image manifest
 
@@ -29,7 +29,7 @@ target:
     repository: myteam
 ```
 
-The `target` section is where all of the images will be synced to. The above yaml would sync all images to the `mycompany` registry in the `myteam` repository: `mycompany.com/myteam/...`. 
+The `target` section is where all of the images will be synced to. The above yaml would sync all images to the `mycompany` registry in the `myteam` repository: `mycompany.com/myteam/...`.
 
 The `repository` field is optional.
 
@@ -68,19 +68,25 @@ All examples are taken from running commands in the `examples/` folder.
 
 ### Create command
 
-Create an image manifest that includes a target registry and a collection of images that should be synced to the target.
+Create an image manifest that will sync images to the given target registry.
 
-```
-$ sinker create --target mycompany.com/myteam
+```shell
+$ sinker create <file|directory> --target mycompany.com/myteam
 ```
 
-#### Passing in a directory or file
+#### --target flag (required)
+
+Specifies the target registry (and optionally a repository) to sync the images to.
+
+#### Passing in a directory or file (optional)
 
 Find all image references in the file or directory that was passed in.
 
 While this tool is not Kubernetes specific, currently the `create` and `update` commands can take a file or directory to find all Kubernetes manifests and extract the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
 
-```
+The intent is that this can be expanded to support other workloads (e.g docker compose).
+
+```shell
 $ sinker create example/bundle.yaml --target mycompany.com/myteam
 ```
 
@@ -100,15 +106,11 @@ images:
     source: quay.io
 ```
 
-#### --target flag (required)
-
-Specifies the target registry (and optionally a repository) to sync the images to
-
-#### Push command
+### Push command
 
 Push all of the images inside of the image manifest to the target registry.
 
-```
+```shell
 $ sinker push
 ```
 
@@ -120,11 +122,11 @@ The `--dryrun` flag will print out a summary of the images that do not exist at 
 
 Updates the current image manifest to reflect new changes found in the Kubernetes manifest(s).
 
-```
+```shell
 $ sinker update <file|directory>
 ```
 
-_NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)_
+_NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)._
 
 #### --target flag (optional)
 
@@ -132,9 +134,9 @@ If desired, you can set a new target in the image manifest by using --target dur
 
 ### Pull command
 
-Pulls the source images found in the image manifest. This is useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities)
+Pulls the source images found in the image manifest. This is useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
 
-```
+```shell
 $ sinker pull
 ```
 
@@ -142,18 +144,18 @@ $ sinker pull
 
 Prints a list of either the `source` or `target` images that exist in the image manifest. This can be useful for piping into additional tooling that acts on image urls.
 
-```
-$ sinker list target
+```shell
+$ sinker list <source|target>
 ```
 
 #### --output flag (optional)
 
-Outputs the list to a file (e.g. `images.txt`)
+Outputs the list to a file (e.g. `source-images.txt`).
 
 ### Check command
 
-Checks if any of the images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.
+Checks if any of the source images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.
 
-```
+```shell
 $ sinker check
 ```
