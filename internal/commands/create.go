@@ -103,11 +103,12 @@ func newCreateCommand() *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
-			if err := viper.BindPFlag("autodetect", cmd.Flags().Lookup("autodetect")); err != nil {
-				return fmt.Errorf("bind autodetect flag: %w", err)
+			var path string
+			if len(args) > 0 {
+				path = args[0]
 			}
 
-			if err := runCreateCommand("."); err != nil {
+			if err := runCreateCommand(path); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
 
@@ -116,7 +117,6 @@ func newCreateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("target", "t", "", "The target repository to sync images to (e.g. organization.com/repo)")
-	cmd.Flags().Bool("autodetect", false, "Perform autodetection when creating the image manifest")
 
 	return &cmd
 }
@@ -133,7 +133,7 @@ func runCreateCommand(path string) error {
 	var imageManifest ImageManifest
 	imageManifest.Target = newTarget(viper.GetString("target"))
 
-	if viper.GetBool("autodetect") {
+	if path != "" {
 		foundImages, err := getFromKubernetesManifests(path, imageManifest.Target)
 		if err != nil {
 			return fmt.Errorf("get from kubernetes manifests: %w", err)
@@ -190,9 +190,9 @@ func marshalImages(images []string, target Target) ([]ContainerImage, error) {
 		imageReference = reference.TagNameOnly(imageReference)
 
 		imageRepository := reference.Path(imageReference)
-
 		if target.Repository != "" {
 			imageRepository = strings.Replace(imageRepository, target.Repository+"/", "", 1)
+			imageRepository = strings.Replace(imageRepository, "library/", "", 1)
 		} else {
 			imageRepository = strings.Replace(imageRepository, target.Repository, "", 1)
 		}

@@ -14,14 +14,15 @@ func newUpdateCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "update <source>",
 		Short: "Update an existing image manifest",
+		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
-			if err := runUpdateCommand("."); err != nil {
-				return fmt.Errorf("create: %w", err)
+			if err := runUpdateCommand(args[0]); err != nil {
+				return fmt.Errorf("update: %w", err)
 			}
 
 			return nil
@@ -38,7 +39,7 @@ func runUpdateCommand(path string) error {
 		return fmt.Errorf("manifest %s not found in current directory", manifestFileName)
 	}
 
-	imageManifest, err := getManifest(path)
+	imageManifest, err := getManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
@@ -64,7 +65,7 @@ func runUpdateCommand(path string) error {
 	return nil
 }
 
-func getManifest(path string) (ImageManifest, error) {
+func getManifest() (ImageManifest, error) {
 	imageManifestContents, err := ioutil.ReadFile(manifestFileName)
 	if err != nil {
 		return ImageManifest{}, fmt.Errorf("reading manifest: %w", err)

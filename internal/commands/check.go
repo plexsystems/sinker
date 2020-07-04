@@ -19,7 +19,7 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := runCheckCommand(ctx, logger, "."); err != nil {
-				return fmt.Errorf("run check: %w", err)
+				return fmt.Errorf("check: %w", err)
 			}
 
 			return nil
@@ -40,7 +40,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 		return fmt.Errorf("new registry: %w", err)
 	}
 
-	manifest, err := getManifest(path)
+	manifest, err := getManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
@@ -53,7 +53,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 
 		imageVersion, err := version.NewVersion(image.Version)
 		if err != nil {
-			logger.Printf("Image %s weird versioning. Skipping ...", image.Source())
+			logger.Printf("Image %s version did not parse correctly. Skipping ...", image.Source())
 			continue
 		}
 

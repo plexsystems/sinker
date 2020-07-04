@@ -51,7 +51,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	manifest, err := getManifest(path)
+	manifest, err := getManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}

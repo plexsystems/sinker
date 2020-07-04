@@ -12,7 +12,7 @@ Releases are also provided in the releases tab on GitHub.
 
 ## The image manifest
 
-All commands either create, update, or read from the image manifest (`.images.yaml`). 
+All commands either create, update, or read from the image manifest (`.images.yaml`).
 
 While the `create` and `update` commands assist with managing the image manifest, the `push` command will not modify the image manifest. Allowing you to manually control the manifest if desired.
 
@@ -69,16 +69,14 @@ Create an image manifest that includes a target registry and a collection of ima
 $ sinker create --target mycompany.com/myteam
 ```
 
-#### --target flag (required)
+#### Passing in a directory or file
 
-Specifies the target registry (and optionally a repository) to sync the images to
+Find all image references in the file or directory that was passed in.
 
-#### --autodetect flag (optional)
-
-While this tool is not Kubernetes specific, currently the `create` and `update` commands find all Kubernetes manifests and extracts the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
+While this tool is not Kubernetes specific, currently the `create` and `update` commands can take a file or directory to find all Kubernetes manifests and extract the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
 
 ```
-$ sinker create --target mycompany.com/myteam --autodetect
+$ sinker create example/bundle.yaml --target mycompany.com/myteam
 ```
 
 ```yaml
@@ -97,6 +95,10 @@ images:
     source: quay.io
 ```
 
+#### --target flag (required)
+
+Specifies the target registry (and optionally a repository) to sync the images to
+
 #### Push command
 
 Push all of the images inside of the image manifest to the target registry.
@@ -111,11 +113,11 @@ The `--dryrun` flag will print out a summary of the images that do not exist at 
 
 ### Update command
 
-```
-$ sinker update
-```
+Updates the current image manifest to reflect new changes found in the Kubernetes manifest(s).
 
-Updates the current manifest to reflect new changes to Kubernetes manifests.
+```
+$ sinker update <file|directory>
+```
 
 _NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)_
 
@@ -125,11 +127,11 @@ If desired, you can set a new target in the image manifest by using --target dur
 
 ### List command
 
+Prints a list of either the `source` or `target` images that exist in the image manifest. This can be useful for piping into additional tooling that acts on image urls.
+
 ```
 $ sinker list target
 ```
-
-Prints a list of either the `source` or `target` images. This can be useful for piping into additional tooling that acts on image urls.
 
 #### --output flag (optional)
 
@@ -137,8 +139,8 @@ Outputs the list to a file (e.g. `images.txt`)
 
 ### Check command
 
+Checks if any of the images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.
+
 ```
 $ sinker check
 ```
-
-Checks if any of the images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.
