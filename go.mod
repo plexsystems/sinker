@@ -13,6 +13,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/hashicorp/go-version v1.1.0
+	github.com/kataras/golog v0.0.18
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/spf13/cobra v1.0.0

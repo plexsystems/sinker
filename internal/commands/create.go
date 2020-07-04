@@ -53,6 +53,10 @@ func newTarget(target string) Target {
 }
 
 func (t Target) String() string {
+	if t.Repository == "" {
+		return t.Registry
+	}
+
 	return t.Registry + "/" + t.Repository
 }
 
@@ -70,17 +74,23 @@ type Auth struct {
 	Password string `yaml:"password,omitempty"`
 }
 
-func (c ContainerImage) String() string {
+// RepositoryWithTag returns the full repository path including the tag
+func (c ContainerImage) RepositoryWithTag() string {
 	return c.Repository + ":" + c.Version
 }
 
 // Source returns the source image
 func (c ContainerImage) Source() string {
+	return c.SourceRegistry + "/" + c.RepositoryWithTag()
+}
+
+// Target returns the target image
+func (c ContainerImage) Target(target Target) string {
 	if c.SourceRegistry == "" {
-		return c.Repository + ":" + c.Version
+		return c.RepositoryWithTag()
 	}
 
-	return c.SourceRegistry + "/" + c.Repository + ":" + c.Version
+	return target.String() + "/" + c.RepositoryWithTag()
 }
 
 func newCreateCommand() *cobra.Command {

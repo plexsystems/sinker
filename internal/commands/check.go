@@ -15,7 +15,7 @@ import (
 func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
-		Short: "Check for newer images in the remote registry",
+		Short: "Check for newer images in the source registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := runCheckCommand(ctx, logger, "."); err != nil {
