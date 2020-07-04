@@ -1,5 +1,10 @@
 # Sinker
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/plexsystems/sinker)](https://goreportcard.com/report/github.com/plexsystems/sinker)
+[![GitHub release](https://img.shields.io/github/release/plexsystems/sinker.svg)](https://github.com/plexsystems/sinker/releases)
+
+![logo](logo.png)
+
 `sinker` syncs container images from one registry to another. This is useful in cases where you need to have images that exist in a public container registry, in a private one.
 
 See the [example](https://github.com/plexsystems/sinker/tree/main/example) folder for more details on the produced files.
