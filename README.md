@@ -130,6 +130,14 @@ _NOTE: The update command will ONLY update image **versions**. This allows for p
 
 If desired, you can set a new target in the image manifest by using --target during an update.
 
+### Pull command
+
+Pulls the source images found in the image manifest. This is useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities)
+
+```
+$ sinker pull
+```
+
 ### List command
 
 Prints a list of either the `source` or `target` images that exist in the image manifest. This can be useful for piping into additional tooling that acts on image urls.

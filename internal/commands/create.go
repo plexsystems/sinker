@@ -81,15 +81,19 @@ func (c ContainerImage) RepositoryWithTag() string {
 
 // Source returns the source image
 func (c ContainerImage) Source() string {
+	if c.SourceRegistry == "docker.io" && !strings.Contains(c.Repository, "/") {
+		return c.SourceRegistry + "/library/" + c.RepositoryWithTag()
+	}
+
+	if c.SourceRegistry == "" {
+		return c.RepositoryWithTag()
+	}
+
 	return c.SourceRegistry + "/" + c.RepositoryWithTag()
 }
 
 // Target returns the target image
 func (c ContainerImage) Target(target Target) string {
-	if c.SourceRegistry == "" {
-		return c.RepositoryWithTag()
-	}
-
 	return target.String() + "/" + c.RepositoryWithTag()
 }
 
@@ -167,6 +171,7 @@ func autoDetectSourceRegistry(repository string) string {
 	repositoryMappings := map[string]string{
 		"kubernetes-ingress-controller": "quay.io",
 		"coreos":                        "quay.io",
+		"open-policy-agent":             "quay.io",
 		"twistlock":                     "registry.twistlock.com",
 	}
 

@@ -15,7 +15,7 @@ func NewDefaultCommand() *cobra.Command {
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
 		Long:    "A CLI tool to sync container images to another registry",
-		Version: "0.5.0",
+		Version: "0.6.0",
 	}
 
 	ctx := context.Background()
@@ -24,6 +24,7 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.AddCommand(newCreateCommand())
 	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newListCommand())
+	cmd.AddCommand(newPullCommand(ctx, logger))
 	cmd.AddCommand(newPushCommand(ctx, logger))
 	cmd.AddCommand(newCheckCommand(ctx, logger))
 
