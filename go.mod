@@ -1,4 +1,4 @@
-module github.com/plexsystems/imagesync
+module github.com/plexsystems/sinker
 
 go 1.14
 

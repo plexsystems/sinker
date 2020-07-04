@@ -134,3 +134,11 @@ Prints a list of either the `source` or `target` images. This can be useful for 
 #### --output flag (optional)
 
 Outputs the list to a file (e.g. `images.txt`)
+
+### Check command
+
+```
+$ sinker check
+```
+
+Checks if any of the images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.

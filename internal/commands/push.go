@@ -98,7 +98,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	for _, image := range unsyncedImages {
 		if err := pushImageToTargetAndWait(ctx, logger, cli, image, manifest.Target); err != nil {
-			return fmt.Errorf("pushing image to mirror: %w", err)
+			return fmt.Errorf("pushing image to target: %w", err)
 		}
 	}
 
