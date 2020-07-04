@@ -65,19 +65,12 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 		if err != nil {
 			return fmt.Errorf("fetch tags: %w", err)
 		}
+
 		imageTags = filterTags(imageTags)
 
-		var newerVersions []string
-		for _, tag := range imageTags {
-			upstreamTag, err := version.NewVersion(tag)
-			if err != nil {
-				logger.Printf("Tag %v was malformed. Skipping ...", upstreamTag)
-				continue
-			}
-
-			if imageVersion.LessThan(upstreamTag) {
-				newerVersions = append(newerVersions, upstreamTag.Original())
-			}
+		newerVersions, err := getNewerVersions(imageVersion, imageTags)
+		if err != nil {
+			return fmt.Errorf("getting newer version: %w", err)
 		}
 
 		if len(newerVersions) == 0 {
@@ -85,16 +78,30 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 			continue
 		}
 
-		if len(newerVersions) > 0 {
-			if len(newerVersions) > 5 {
-				newerVersions = newerVersions[len(newerVersions)-5:]
-			}
-
-			logger.Printf("New versions for %v found: %v", image.Source(), newerVersions)
-		}
+		logger.Printf("New versions for %v found: %v", image.Source(), newerVersions)
 	}
 
 	return nil
+}
+
+func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]string, error) {
+	var newerVersions []string
+	for _, foundTag := range foundTags {
+		tag, err := version.NewVersion(foundTag)
+		if err != nil {
+			continue
+		}
+
+		if currentVersion.LessThan(tag) {
+			newerVersions = append(newerVersions, tag.Original())
+		}
+	}
+
+	if len(newerVersions) > 5 {
+		newerVersions = newerVersions[len(newerVersions)-5:]
+	}
+
+	return newerVersions, nil
 }
 
 func filterTags(tags []string) []string {
