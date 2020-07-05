@@ -132,7 +132,7 @@ func waitForImagePulled(ctx context.Context, logger *log.Logger, cli *client.Cli
 			return false, fmt.Errorf("checking local image: %w", err)
 		}
 
-		logger.Printf("Pulling %s ...\n", image.Source())
+		logger.Printf("Pulling %s ...", image.Source())
 		return exists, nil
 	})
 }
