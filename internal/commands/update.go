@@ -2,12 +2,9 @@ package commands
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 func newUpdateCommand() *cobra.Command {
@@ -35,54 +32,26 @@ func newUpdateCommand() *cobra.Command {
 }
 
 func runUpdateCommand(path string) error {
-	if _, err := os.Stat(manifestFileName); os.IsNotExist(err) {
-		return fmt.Errorf("manifest %s not found in current directory", manifestFileName)
-	}
-
-	imageManifest, err := getManifest()
+	currentManifest, err := GetManifest()
 	if err != nil {
-		return fmt.Errorf("get manifest: %w", err)
+		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	if viper.GetString("target") != "" {
-		imageManifest.Target = newTarget(viper.GetString("target"))
+	var target string
+	if viper.GetString("target") == "" {
+		target = currentManifest.Target.String()
+	} else {
+		target = viper.GetString("target")
 	}
 
-	foundImages, err := getFromKubernetesManifests(path, imageManifest.Target)
+	updatedManifest, err := NewAutodetectManifest(target, path)
 	if err != nil {
-		return fmt.Errorf("get from kubernetes manifests: %w", err)
+		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	imageManifest.Images, err = getUpdatedImages(foundImages, imageManifest)
-	if err != nil {
-		return fmt.Errorf("get updated images: %w", err)
-	}
-
-	if err := writeManifest(imageManifest); err != nil {
-		return fmt.Errorf("write manifest: %w", err)
-	}
-
-	return nil
-}
-
-func getManifest() (ImageManifest, error) {
-	imageManifestContents, err := ioutil.ReadFile(manifestFileName)
-	if err != nil {
-		return ImageManifest{}, fmt.Errorf("reading manifest: %w", err)
-	}
-
-	var currentImageManifest ImageManifest
-	if err := yaml.Unmarshal(imageManifestContents, &currentImageManifest); err != nil {
-		return ImageManifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
-	}
-
-	return currentImageManifest, nil
-}
-
-func getUpdatedImages(images []ContainerImage, manifest ImageManifest) ([]ContainerImage, error) {
 	var updatedImages []ContainerImage
-	for _, updatedImage := range images {
-		for _, currentImage := range manifest.Images {
+	for _, updatedImage := range updatedManifest.Images {
+		for _, currentImage := range currentManifest.Images {
 			if currentImage.Repository == updatedImage.Repository {
 				updatedImage.Auth = currentImage.Auth
 				updatedImage.Repository = currentImage.Repository
@@ -93,5 +62,11 @@ func getUpdatedImages(images []ContainerImage, manifest ImageManifest) ([]Contai
 		updatedImages = append(updatedImages, updatedImage)
 	}
 
-	return updatedImages, nil
+	updatedManifest.Images = updatedImages
+
+	if err := WriteManifest(updatedManifest); err != nil {
+		return fmt.Errorf("writing manifest: %w", err)
+	}
+
+	return nil
 }

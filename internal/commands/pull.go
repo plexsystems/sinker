@@ -2,15 +2,11 @@ package commands
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
-	"github.com/docker/cli/cli/config"
-	"github.com/docker/cli/cli/config/credentials"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
@@ -41,13 +37,13 @@ func runPullCommand(ctx context.Context, logger *log.Logger) error {
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	manifest, err := getManifest()
+	manifest, err := GetManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
 	if len(manifest.Images) == 0 {
-		return fmt.Errorf("no images found in manifest (%s)", manifestFileName)
+		return errors.New("no images found in the image manifest")
 	}
 
 	if err := pullSourceImages(ctx, cli, logger, manifest.Images); err != nil {
@@ -55,50 +51,6 @@ func runPullCommand(ctx context.Context, logger *log.Logger) error {
 	}
 
 	return nil
-}
-
-func getEncodedImageAuth(image ContainerImage) (string, error) {
-	username := os.Getenv(image.Auth.Username)
-	password := os.Getenv(image.Auth.Password)
-
-	authConfig := Auth{
-		Username: username,
-		Password: password,
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
-}
-
-func getEncodedAuthForRegistry(registry string) (string, error) {
-	if registry == "" {
-		registry = "https://index.docker.io/v2/"
-	}
-
-	cfg, err := config.Load(config.Dir())
-	if err != nil {
-		return "", fmt.Errorf("loading docker config: %w", err)
-	}
-
-	if !cfg.ContainsAuth() {
-		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
-	}
-
-	authConfig, err := cfg.GetAuthConfig(registry)
-	if err != nil {
-		return "", fmt.Errorf("getting auth config: %w", err)
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
 
 func imageExistsLocally(ctx context.Context, cli *client.Client, image ContainerImage) (bool, error) {

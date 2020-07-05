@@ -39,7 +39,7 @@ func newListCommand() *cobra.Command {
 }
 
 func runListCommand(path string, location string) error {
-	manifest, err := getManifest()
+	manifest, err := GetManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}

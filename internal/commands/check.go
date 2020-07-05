@@ -40,7 +40,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 		return fmt.Errorf("new registry: %w", err)
 	}
 
-	manifest, err := getManifest()
+	manifest, err := GetManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}

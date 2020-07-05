@@ -47,13 +47,13 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	manifest, err := getManifest()
+	manifest, err := GetManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
 	if len(manifest.Images) == 0 {
-		return fmt.Errorf("no images found in manifest (%s)", manifestFileName)
+		return errors.New("no images found in the image manifest")
 	}
 
 	var unsyncedImages []ContainerImage
