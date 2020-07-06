@@ -11,8 +11,8 @@ import (
 )
 
 func getEncodedAuthForRegistry(registry string) (string, error) {
-	if registry == "" {
-		registry = "https://index.docker.io/v2/"
+	if registry == "" || registry == "docker.io" {
+		registry = "https://index.docker.io/v1/"
 	}
 
 	cfg, err := config.Load(config.Dir())
