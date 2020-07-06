@@ -36,8 +36,8 @@ func (r Registry) String() string {
 // ContainerImage is a container image
 type ContainerImage struct {
 	Source  Registry `yaml:"source,omitempty"`
-	Version string   `yaml:"version"`
 	Target  Registry `yaml:"target,omitempty"`
+	Version string   `yaml:"version"`
 }
 
 // SourceImage returns the source image

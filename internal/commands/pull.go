@@ -44,12 +44,22 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string) er
 	}
 
 	for _, image := range manifest.Images {
-		auth, err := getAuthForRegistry(image.Source)
+		var registry Registry
+		var pullImage string
+		if location == "source" {
+			registry = image.Source
+			pullImage = image.SourceImage()
+		} else {
+			registry = image.Target
+			pullImage = image.TargetImage()
+		}
+
+		auth, err := getAuthForRegistry(registry)
 		if err != nil {
 			return fmt.Errorf("get auth: %w", err)
 		}
 
-		if err := client.PullImage(ctx, image.SourceImage(), auth); err != nil {
+		if err := client.PullImage(ctx, pullImage, auth); err != nil {
 			return fmt.Errorf("pull image: %w", err)
 		}
 	}
