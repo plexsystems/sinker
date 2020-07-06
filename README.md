@@ -134,10 +134,10 @@ If desired, you can set a new target in the image manifest by using --target dur
 
 ### Pull command
 
-Pulls the source images found in the image manifest. This is useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
+Pulls the source or target images found in the image manifest. Pulling from source can be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
 
 ```shell
-$ sinker pull
+$ sinker pull <source|target>
 ```
 
 ### List command
