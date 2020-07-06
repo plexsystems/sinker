@@ -14,48 +14,48 @@ const manifestFileName = ".images.yaml"
 
 // Manifest is a collection of images to sync
 type Manifest struct {
-	Target Target           `yaml:"target"`
+	Target Registry         `yaml:"target"`
 	Images []ContainerImage `yaml:"images,omitempty"`
 }
 
-// Target is the registry and repository to sync images to
-type Target struct {
-	Registry   string `yaml:"registry"`
+// Registry is the registry and repository to sync images to
+type Registry struct {
+	Host       string `yaml:"host"`
 	Repository string `yaml:"repository,omitempty"`
+	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
-func (t Target) String() string {
-	if t.Repository == "" {
-		return t.Registry
+func (r Registry) String() string {
+	if r.Repository == "" {
+		return r.Host
 	}
 
-	return t.Registry + "/" + t.Repository
+	return r.Host + "/" + r.Repository
 }
 
 // ContainerImage is a container image
 type ContainerImage struct {
-	Repository     string `yaml:"repository"`
-	Version        string `yaml:"version"`
-	SourceRegistry string `yaml:"source,omitempty"`
-	Auth           Auth   `yaml:"auth,omitempty"`
+	Source  Registry `yaml:"source,omitempty"`
+	Version string   `yaml:"version"`
+	Target  Registry `yaml:"target,omitempty"`
 }
 
-// Source returns the source image
-func (c ContainerImage) Source() string {
-	if c.SourceRegistry == "docker.io" && !strings.Contains(c.Repository, "/") {
-		return c.SourceRegistry + "/library/" + c.Repository + ":" + c.Version
+// SourceImage returns the source image
+func (c ContainerImage) SourceImage() string {
+	if c.Source.Host == "docker.io" && !strings.Contains(c.Source.Repository, "/") {
+		return c.Source.Host + "/library/" + c.Source.Repository + ":" + c.Version
 	}
 
-	if c.SourceRegistry == "" {
-		return c.Repository + ":" + c.Version
+	if c.Source.Host == "" {
+		return c.Source.Repository + ":" + c.Version
 	}
 
-	return c.SourceRegistry + "/" + c.Repository + ":" + c.Version
+	return c.Source.Host + "/" + c.Source.Repository + ":" + c.Version
 }
 
-// Target returns the target image
-func (c ContainerImage) Target(target Target) string {
-	return target.String() + "/" + c.Repository + ":" + c.Version
+// TargetImage returns the target image
+func (c ContainerImage) TargetImage() string {
+	return c.Target.String() + "/" + c.Source.Repository + ":" + c.Version
 }
 
 // Auth is a username and password to log into a registry
@@ -66,19 +66,19 @@ type Auth struct {
 
 // NewManifest returns a new image manifest
 func NewManifest(target string) Manifest {
-	var registry string
+	var host string
 	var repository string
 
 	targetTokens := strings.Split(target, "/")
 	if len(targetTokens) > 1 {
-		registry = targetTokens[0]
+		host = targetTokens[0]
 		repository = strings.Join(targetTokens[1:], "/")
 	} else {
-		registry = target
+		host = target
 	}
 
-	targetLocation := Target{
-		Registry:   registry,
+	targetLocation := Registry{
+		Host:       host,
 		Repository: repository,
 	}
 
@@ -113,6 +113,12 @@ func GetManifest() (Manifest, error) {
 	var currentImageManifest Manifest
 	if err := yaml.Unmarshal(imageManifestContents, &currentImageManifest); err != nil {
 		return Manifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
+	}
+
+	for i := range currentImageManifest.Images {
+		if currentImageManifest.Images[i].Target.Host == "" {
+			currentImageManifest.Images[i].Target = currentImageManifest.Target
+		}
 	}
 
 	return currentImageManifest, nil

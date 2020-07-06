@@ -47,9 +47,9 @@ func runListCommand(path string, location string) error {
 	var listImages []string
 	for _, image := range manifest.Images {
 		if location == "source" {
-			listImages = append(listImages, image.Source())
+			listImages = append(listImages, image.SourceImage())
 		} else {
-			listImages = append(listImages, image.Target(manifest.Target))
+			listImages = append(listImages, image.TargetImage())
 		}
 	}
 

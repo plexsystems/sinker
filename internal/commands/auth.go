@@ -10,9 +10,35 @@ import (
 	"github.com/docker/cli/cli/config/credentials"
 )
 
-func getEncodedAuthForRegistry(registry string) (string, error) {
-	if registry == "" {
-		registry = "https://index.docker.io/v2/"
+func getAuthForRegistry(registry Registry) (string, error) {
+	if registry.Auth.Password != "" {
+		username := os.Getenv(registry.Auth.Username)
+		password := os.Getenv(registry.Auth.Password)
+
+		authConfig := Auth{
+			Username: username,
+			Password: password,
+		}
+
+		jsonAuth, err := json.Marshal(authConfig)
+		if err != nil {
+			return "", fmt.Errorf("marshal auth: %w", err)
+		}
+
+		return base64.URLEncoding.EncodeToString(jsonAuth), nil
+	}
+
+	auth, err := getAuthForHost(registry.Host)
+	if err != nil {
+		return "", fmt.Errorf("get auth for host: %w", err)
+	}
+
+	return auth, nil
+}
+
+func getAuthForHost(host string) (string, error) {
+	if host == "" {
+		host = "https://index.docker.io/v2/"
 	}
 
 	cfg, err := config.Load(config.Dir())
@@ -24,26 +50,9 @@ func getEncodedAuthForRegistry(registry string) (string, error) {
 		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
 	}
 
-	authConfig, err := cfg.GetAuthConfig(registry)
+	authConfig, err := cfg.GetAuthConfig(host)
 	if err != nil {
 		return "", fmt.Errorf("getting auth config: %w", err)
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
-}
-
-func getEncodedImageAuth(image ContainerImage) (string, error) {
-	username := os.Getenv(image.Auth.Username)
-	password := os.Getenv(image.Auth.Password)
-
-	authConfig := Auth{
-		Username: username,
-		Password: password,
 	}
 
 	jsonAuth, err := json.Marshal(authConfig)

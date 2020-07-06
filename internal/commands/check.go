@@ -46,22 +46,22 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 	}
 
 	for _, image := range manifest.Images {
-		if image.SourceRegistry != "docker.io" {
-			logger.Printf("Image %s not sourced from docker.io. Skipping ...", image.Source())
+		if image.Source.Host != "docker.io" {
+			logger.Printf("Image %s not sourced from docker.io. Skipping ...", image.SourceImage())
 			continue
 		}
 
 		imageVersion, err := version.NewVersion(image.Version)
 		if err != nil {
-			logger.Printf("Image %s version did not parse correctly. Skipping ...", image.Source())
+			logger.Printf("Image %s version did not parse correctly. Skipping ...", image.SourceImage())
 			continue
 		}
 
-		if !strings.Contains(image.Repository, "/") {
-			image.Repository = "library/" + image.Repository
+		if !strings.Contains(image.Source.Repository, "/") {
+			image.Source.Repository = "library/" + image.Source.Repository
 		}
 
-		imageTags, err := dockerRegistry.Tags(ctx, image.Repository)
+		imageTags, err := dockerRegistry.Tags(ctx, image.Source.Repository)
 		if err != nil {
 			return fmt.Errorf("fetch tags: %w", err)
 		}
@@ -74,11 +74,11 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 		}
 
 		if len(newerVersions) == 0 {
-			logger.Printf("Image %v is up to date!", image.Source())
+			logger.Printf("Image %v is up to date!", image.SourceImage())
 			continue
 		}
 
-		logger.Printf("New versions for %v found: %v", image.Source(), newerVersions)
+		logger.Printf("New versions for %v found: %v", image.SourceImage(), newerVersions)
 	}
 
 	return nil

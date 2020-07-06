@@ -52,10 +52,9 @@ func runUpdateCommand(path string) error {
 	var updatedImages []ContainerImage
 	for _, updatedImage := range updatedManifest.Images {
 		for _, currentImage := range currentManifest.Images {
-			if currentImage.Repository == updatedImage.Repository {
-				updatedImage.Auth = currentImage.Auth
-				updatedImage.Repository = currentImage.Repository
-				updatedImage.SourceRegistry = currentImage.SourceRegistry
+			if currentImage.Source.Repository == updatedImage.Source.Repository {
+				updatedImage.Source = currentImage.Source
+				updatedImage.Target = currentImage.Target
 			}
 		}
 

@@ -5,22 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
-		Use:   "pull",
-		Short: "Pull the source images found in the image manifest",
-		Args:  cobra.OnlyValidArgs,
+		Use:       "pull <source|target>",
+		Short:     "Pull the source images found in the image manifest",
+		Args:      cobra.OnlyValidArgs,
+		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runPullCommand(ctx, logger); err != nil {
+			if err := runPullCommand(ctx, logger, args[0]); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -31,10 +28,10 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(ctx context.Context, logger *log.Logger) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+func runPullCommand(ctx context.Context, logger *log.Logger, location string) error {
+	client, err := NewClient(logger)
 	if err != nil {
-		return fmt.Errorf("new docker client: %w", err)
+		return fmt.Errorf("new client: %w", err)
 	}
 
 	manifest, err := GetManifest()
@@ -46,93 +43,16 @@ func runPullCommand(ctx context.Context, logger *log.Logger) error {
 		return errors.New("no images found in the image manifest")
 	}
 
-	if err := pullSourceImages(ctx, cli, logger, manifest.Images); err != nil {
-		return fmt.Errorf("pull source images: %w", err)
-	}
-
-	return nil
-}
-
-func imageExistsLocally(ctx context.Context, cli *client.Client, image ContainerImage) (bool, error) {
-	imageList, err := cli.ImageList(ctx, types.ImageListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("image list: %w", err)
-	}
-
-	// When an image is sourced from docker hub, the image tag does
-	// not include docker.io on the local machine
-	if image.SourceRegistry == "docker.io" {
-		image.SourceRegistry = ""
-	}
-
-	for _, imageSummary := range imageList {
-		for _, localImage := range imageSummary.RepoTags {
-			if localImage == image.Source() {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func pullSourceImages(ctx context.Context, cli *client.Client, logger *log.Logger, images []ContainerImage) error {
-	for _, image := range images {
-		exists, err := imageExistsLocally(ctx, cli, image)
+	for _, image := range manifest.Images {
+		auth, err := getAuthForRegistry(image.Source)
 		if err != nil {
-			return fmt.Errorf("checking local image: %w", err)
+			return fmt.Errorf("get auth: %w", err)
 		}
 
-		if exists {
-			logger.Printf("Image %s exists locally. Skipping ...", image.Source())
-			continue
-		}
-
-		if err := pullSourceImageAndWait(ctx, logger, cli, image); err != nil {
-			return fmt.Errorf("waiting for source image pull: %w", err)
+		if err := client.PullImage(ctx, image.SourceImage(), auth); err != nil {
+			return fmt.Errorf("pull image: %w", err)
 		}
 	}
 
 	return nil
-}
-
-func pullSourceImageAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	var encodedAuth string
-	var err error
-	if image.Auth.Password != "" {
-		encodedAuth, err = getEncodedImageAuth(image)
-	} else {
-		encodedAuth, err = getEncodedAuthForRegistry(image.SourceRegistry)
-	}
-	if err != nil {
-		return fmt.Errorf("get encoded auth: %w", err)
-	}
-
-	opts := types.ImagePullOptions{
-		RegistryAuth: encodedAuth,
-	}
-
-	reader, err := cli.ImagePull(ctx, image.Source(), opts)
-	if err != nil {
-		return fmt.Errorf("image pull: %w", err)
-	}
-
-	if err := waitForImagePulled(ctx, logger, cli, image); err != nil {
-		return fmt.Errorf("wait for source image pull: %w", err)
-	}
-	reader.Close()
-
-	return nil
-}
-
-func waitForImagePulled(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage) error {
-	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
-		exists, err := imageExistsLocally(ctx, cli, image)
-		if err != nil {
-			return false, fmt.Errorf("checking local image: %w", err)
-		}
-
-		logger.Printf("Pulling %s ...", image.Source())
-		return exists, nil
-	})
 }
