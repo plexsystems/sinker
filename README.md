@@ -74,7 +74,7 @@ In the event that an image that needs to be sync'd is in another registry, the `
 
 ## Usage
 
-All examples are taken from running commands in the `examples/` folder.
+All examples are taken from running commands in the `examples/` folder. To specify a different folder where the manifest exists use the `--manifest` flag (default is working directory)
 
 ### Create command
 

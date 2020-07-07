@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -161,8 +162,9 @@ func NewAutodetectManifest(target string, path string) (Manifest, error) {
 }
 
 // GetManifest returns the current manifest file in the working directory
-func GetManifest() (Manifest, error) {
-	manifestContents, err := ioutil.ReadFile(manifestFileName)
+func GetManifest(directory string) (Manifest, error) {
+	manifestLocation := filepath.Join(directory, manifestFileName)
+	manifestContents, err := ioutil.ReadFile(manifestLocation)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -190,15 +192,15 @@ func marshalManifest(manifestContents []byte) (Manifest, error) {
 	return manifest, nil
 }
 
-// WriteManifest writes the image manifest to disk
-func WriteManifest(manifest Manifest) error {
+func writeManifest(manifest Manifest, directory string) error {
 	imageManifestContents, err := yaml.Marshal(&manifest)
 	if err != nil {
 		return fmt.Errorf("marshal image manifest: %w", err)
 	}
 	imageManifestContents = bytes.ReplaceAll(imageManifestContents, []byte(`"`), []byte(""))
 
-	if err := ioutil.WriteFile(manifestFileName, imageManifestContents, os.ModePerm); err != nil {
+	manifestLocation := filepath.Join(directory, manifestFileName)
+	if err := ioutil.WriteFile(manifestLocation, imageManifestContents, os.ModePerm); err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
 

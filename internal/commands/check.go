@@ -10,6 +10,7 @@ import (
 	"github.com/genuinetools/reg/registry"
 	"github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
@@ -18,7 +19,8 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 		Short: "Check for newer images in the source registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runCheckCommand(ctx, logger, "."); err != nil {
+			manifestDirectory := viper.GetString("manifest")
+			if err := runCheckCommand(ctx, logger, manifestDirectory); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -29,7 +31,7 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error {
+func runCheckCommand(ctx context.Context, logger *log.Logger, directory string) error {
 	dockerOpts := registry.Opt{
 		Insecure: true,
 		Domain:   "https://index.docker.io",
@@ -40,7 +42,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 		return fmt.Errorf("new registry: %w", err)
 	}
 
-	manifest, err := GetManifest()
+	manifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
