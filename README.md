@@ -31,8 +31,6 @@ target:
 
 The `target` section is where the images will be synced to. The above yaml would sync all images to the `myteam` repository hosted at `mycompany.com` (`mycompany.com/myteam/...`)
 
-The `repository` field is optional.
-
 ### The images section
 
 ```yaml
@@ -48,12 +46,25 @@ sources:
   auth:
     username: DOCKER_USER_ENV
     password: DOCKER_PASSWORD_ENV
-- repository: coreos/prometheus-config-reloader
-  host: quay.io
-  tag: v0.40.0
+- repository: nginx
+  tag: 1.19
 ```
 
-The images section includes the source registry and the repository for the image. During a sync, an image `push` would result in `mycompany.com/myteam/coreos/prometheus-operator:v0.40.0`
+The images section includes the host of the registry and the repository where the image is located. For example, the `prometheus-operator` would be pushed to:
+
+```text
+mycompany.com/myteam/coreos/prometheus-operator:v0.40.0
+```
+
+#### Optional host defaults to Docker Hub
+
+In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub (`docker.io`).
+
+If you prefer to always set the host for Docker Hub, you must add the `library` repository for images that are not in a repository. For example `nginx`, which has no repository, should be added as:
+
+```text
+docker.io/library/nginx
+```
 
 #### Auth
 
