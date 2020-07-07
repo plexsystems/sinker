@@ -132,7 +132,11 @@ Pulls the source or target images found in the image manifest.
 
 Pulling the `source` could be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
 
+<<<<<<< HEAD
 Pulling the `target` could be useful if you need to load the images into another environment, such as [Kind](https://github.com/kubernetes-sigs/kind)
+=======
+Pulls the source or target images found in the image manifest. Pulling from source can be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
+>>>>>>> 7723b6a7411d355ad72c53262ab41a1bef9f9850
 
 ```shell
 $ sinker pull <source|target>

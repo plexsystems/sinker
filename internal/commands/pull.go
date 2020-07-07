@@ -12,7 +12,7 @@ import (
 func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
-		Short:     "Pull the source images found in the image manifest",
+		Short:     "Pull the source or target images found in the image manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 
@@ -21,7 +21,6 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			if len(args) > 0 {
 				location = args[0]
 			}
-
 			if err := runPullCommand(ctx, logger, location); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
