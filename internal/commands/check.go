@@ -42,7 +42,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, directory string) 
 		return fmt.Errorf("new registry: %w", err)
 	}
 
-	manifest, err := GetManifest(viper.GetString("manifest"))
+	manifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
