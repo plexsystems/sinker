@@ -10,33 +10,61 @@ import (
 	"github.com/docker/cli/cli/config/credentials"
 )
 
-func getSourceImageAuth(image SourceImage) (string, error) {
-	if image.Auth.Password != "" {
-		username := os.Getenv(image.Auth.Username)
-		password := os.Getenv(image.Auth.Password)
-
-		authConfig := Auth{
-			Username: username,
-			Password: password,
-		}
-
-		jsonAuth, err := json.Marshal(authConfig)
+func getEncodedSourceAuth(source SourceImage) (string, error) {
+	if source.Auth.Password != "" {
+		auth, err := getEncodedAuth(source.Auth)
 		if err != nil {
-			return "", fmt.Errorf("marshal auth: %w", err)
+			return "", fmt.Errorf("get encoded auth: %w", err)
 		}
 
-		return base64.URLEncoding.EncodeToString(jsonAuth), nil
+		return auth, nil
 	}
 
-	auth, err := getAuthForHost(image.Path.Host())
+	auth, err := getEncodedAuthForHost(source.Host)
 	if err != nil {
-		return "", fmt.Errorf("get auth for host: %w", err)
+		return "", fmt.Errorf("get encoded auth for host: %w", err)
 	}
 
 	return auth, nil
 }
 
-func getAuthForHost(host string) (string, error) {
+func getEncodedTargetAuth(target Target) (string, error) {
+	if target.Auth.Password != "" {
+		auth, err := getEncodedAuth(target.Auth)
+		if err != nil {
+			return "", fmt.Errorf("get encoded auth: %w", err)
+		}
+
+		return auth, nil
+	}
+
+	auth, err := getEncodedAuthForHost(target.Host)
+	if err != nil {
+		return "", fmt.Errorf("get encoded auth for host: %w", err)
+	}
+
+	return auth, nil
+}
+
+func getEncodedAuth(auth Auth) (string, error) {
+	username := os.Getenv(auth.Username)
+	password := os.Getenv(auth.Password)
+
+	authConfig := Auth{
+		Username: username,
+		Password: password,
+	}
+
+	jsonAuth, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", fmt.Errorf("marshal auth: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(jsonAuth), nil
+
+}
+
+func getEncodedAuthForHost(host string) (string, error) {
 	if host == "" || host == "docker.io" {
 		host = "https://index.docker.io/v1/"
 	}

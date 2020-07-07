@@ -13,7 +13,7 @@ func newListCommand() *cobra.Command {
 		Use:       "list <source|target>",
 		Short:     "List the images found in the image manifest",
 		Args:      cobra.OnlyValidArgs,
-		ValidArgs: []string{"", "source", "target"},
+		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {

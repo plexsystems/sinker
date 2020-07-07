@@ -18,13 +18,29 @@ type Manifest struct {
 	Images []SourceImage `yaml:"sources,omitempty"`
 }
 
-// Target ...
+// Target is a target location for an image
 type Target struct {
-	Path Path `yaml:"path"`
-	Auth Auth `yaml:"auth,omitempty"`
+	Host       string `yaml:"host,omitempty"`
+	Repository string `yaml:"repository,omitempty"`
+	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
-// Path is the registry and repository to sync images to
+func (t Target) String() string {
+	var target string
+	if t.Repository != "" {
+		target = "/" + t.Repository + target
+	}
+
+	if t.Host != "" {
+		target = "/" + t.Host + target
+	}
+
+	target = strings.TrimLeft(target, "/")
+
+	return target
+}
+
+// Path is a registry host and repository
 type Path string
 
 func (p Path) String() string {
@@ -39,6 +55,10 @@ func (p Path) Host() string {
 
 	hostTokens := strings.Split(string(p), "/")
 
+	if !strings.Contains(hostTokens[0], ".") && !strings.Contains(hostTokens[0], ":") {
+		return ""
+	}
+
 	return hostTokens[0]
 }
 
@@ -51,43 +71,52 @@ func (p Path) Repository() string {
 	return strings.ReplaceAll(string(p), p.Host()+"/", "")
 }
 
-// SourceImage is a container image
+// SourceImage is a source container image
 type SourceImage struct {
-	Path    Path   `yaml:"path,omitempty"`
-	Target  Target `yaml:"target,omitempty"`
-	Version string `yaml:"version"`
-	Auth    Auth   `yaml:"auth,omitempty"`
+	Repository string `yaml:"repository"`
+	Host       string `yaml:"host,omitempty"`
+	Target     Target `yaml:"target,omitempty"`
+	Tag        string `yaml:"tag,omitempty"`
+	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
-// String returns the source image
+// String returns the source image including its tag
 func (c SourceImage) String() string {
-	if c.Version == "" {
-		return c.Path.String()
+	var source string
+	if c.Tag != "" {
+		source = ":" + c.Tag
 	}
 
-	return c.Path.String() + ":" + c.Version
+	if c.Repository != "" {
+		source = "/" + c.Repository + source
+	}
+
+	if c.Host != "" {
+		source = "/" + c.Host + source
+	}
+
+	source = strings.TrimLeft(source, "/")
+
+	return source
 }
 
-// TargetImage returns the target image
+// TargetImage returns the target image includes its tag
 func (c SourceImage) TargetImage() string {
 	var target string
-
-	if c.Version != "" {
-		target = ":" + c.Version
-	} else {
-		target = ":latest"
+	if c.Tag != "" {
+		target = ":" + c.Tag
 	}
 
-	if c.Path.Repository() != "" {
-		target = "/" + c.Path.Repository() + target
+	if c.Repository != "" {
+		target = "/" + c.Repository + target
 	}
 
-	if c.Target.Path.Repository() != "" {
-		target = "/" + c.Target.Path.Repository() + target
+	if c.Target.Repository != "" {
+		target = "/" + c.Target.Repository + target
 	}
 
-	if c.Target.Path.Host() != "" {
-		target = "/" + c.Target.Path.Host() + target
+	if c.Target.Host != "" {
+		target = "/" + c.Target.Host + target
 	}
 
 	target = strings.TrimLeft(target, "/")
@@ -103,12 +132,15 @@ type Auth struct {
 
 // NewManifest returns a new image manifest
 func NewManifest(target string) Manifest {
-	registry := Target{
-		Path: Path(target),
+	targetPath := Path(target)
+
+	manifestTarget := Target{
+		Host:       targetPath.Host(),
+		Repository: targetPath.Repository(),
 	}
 
 	manifest := Manifest{
-		Target: registry,
+		Target: manifestTarget,
 	}
 
 	return manifest
@@ -150,7 +182,7 @@ func marshalManifest(manifestContents []byte) (Manifest, error) {
 	}
 
 	for i := range manifest.Images {
-		if manifest.Images[i].Target.Path == "" {
+		if manifest.Images[i].Target.Host == "" {
 			manifest.Images[i].Target = manifest.Target
 		}
 	}

@@ -50,14 +50,14 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	logger.Println("Finding images that do not exist at target registry ...")
 
-	auth, err := getAuthForHost(manifest.Target.Path.Host())
-	if err != nil {
-		return fmt.Errorf("get host auth: %w", err)
-	}
-
 	var unsyncedImages []SourceImage
 	for _, image := range manifest.Images {
-		exists, err := client.imageExistsAtRemote(ctx, image.Target.Path.Host(), auth)
+		auth, err := getEncodedTargetAuth(image.Target)
+		if err != nil {
+			return fmt.Errorf("get host auth: %w", err)
+		}
+
+		exists, err := client.imageExistsAtRemote(ctx, image.TargetImage(), auth)
 		if err != nil {
 			return fmt.Errorf("checking remote target image: %w", err)
 		}
@@ -81,13 +81,13 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 	}
 
 	for _, image := range unsyncedImages {
-		auth, err := getSourceImageAuth(image)
+		auth, err := getEncodedSourceAuth(image)
 		if err != nil {
 			return fmt.Errorf("get host auth: %w", err)
 		}
 
 		if err := client.PullImage(ctx, image.String(), auth); err != nil {
-			return fmt.Errorf("pullinh image: %w", err)
+			return fmt.Errorf("pulling image: %w", err)
 		}
 	}
 
@@ -98,10 +98,13 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 	}
 
 	for _, image := range unsyncedImages {
-		auth, err := getSourceImageAuth(image)
+		auth, err := getEncodedTargetAuth(image.Target)
 		if err != nil {
-			return fmt.Errorf("get host auth: %w", err)
+			return fmt.Errorf("get source auth: %w", err)
 		}
+
+		fmt.Println(auth)
+		fmt.Println(image.TargetImage())
 
 		if err := client.PushImage(ctx, image.TargetImage(), auth); err != nil {
 			return fmt.Errorf("pushing image to target: %w", err)

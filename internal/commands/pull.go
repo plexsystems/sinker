@@ -50,21 +50,25 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string) er
 
 	for _, image := range manifest.Images {
 		var pullImage string
+		var auth string
+		var err error
 		if location == "target" {
 			pullImage = image.TargetImage()
+			auth, err = getEncodedTargetAuth(image.Target)
 		} else {
 			pullImage = image.String()
+			auth, err = getEncodedSourceAuth(image)
 		}
-
-		auth, err := getSourceImageAuth(image)
 		if err != nil {
-			return fmt.Errorf("get auth: %w", err)
+			return fmt.Errorf("getting %s auth: %w", location, err)
 		}
 
 		if err := client.PullImage(ctx, pullImage, auth); err != nil {
 			return fmt.Errorf("pull image: %w", err)
 		}
 	}
+
+	client.Logger.Println("All images pulled!")
 
 	return nil
 }

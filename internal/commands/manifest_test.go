@@ -4,6 +4,30 @@ import (
 	"testing"
 )
 
+func TestTarget_NoRepository_EmptyRepository(t *testing.T) {
+	const expected = "target.com"
+
+	target := Target{
+		Host: expected,
+	}
+
+	if target.String() != expected {
+		t.Errorf("expected target to be %s, actual %s", expected, target.String())
+	}
+}
+
+func TestTarget_NoRepository_ReturnsRepository(t *testing.T) {
+	const expected = "target.com/repo"
+	target := Target{
+		Host:       "target.com",
+		Repository: "repo",
+	}
+
+	if target.String() != expected {
+		t.Errorf("expected target to be %s, actual %s", expected, target.String())
+	}
+}
+
 func TestPath_NoRepository_EmptyRepository(t *testing.T) {
 	const expected = "repo"
 	path := Path(expected)
@@ -34,21 +58,24 @@ func TestPath_WithRepository_ReturnsRepository(t *testing.T) {
 
 func TestSourceImage(t *testing.T) {
 	image := SourceImage{
-		Path:    Path("quay.io/repo"),
-		Version: "v1.0.0",
+		Host:       "quay.io",
+		Repository: "repo",
+		Tag:        "v1.0.0",
 	}
 
 	imageWithPath := SourceImage{
-		Path:    Path("quay.io/foo/repo"),
-		Version: "v1.0.0",
+		Host:       "quay.io",
+		Repository: "foo/repo",
+		Tag:        "v1.0.0",
 	}
 
 	target := Target{
-		Path: Path("target.com"),
+		Host: "target.com",
 	}
 
 	targetWithRepository := Target{
-		Path: Path("target.com/bar"),
+		Host:       "target.com",
+		Repository: "bar",
 	}
 
 	testCases := []struct {

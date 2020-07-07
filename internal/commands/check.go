@@ -46,18 +46,18 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, path string) error
 	}
 
 	for _, image := range manifest.Images {
-		if image.Path.Host() != "docker.io" {
+		if image.Host != "docker.io" {
 			logger.Printf("Image %s not sourced from docker.io. Skipping ...", image.String())
 			continue
 		}
 
-		imageVersion, err := version.NewVersion(image.Version)
+		imageVersion, err := version.NewVersion(image.Tag)
 		if err != nil {
 			logger.Printf("Image %s version did not parse correctly. Skipping ...", image.String())
 			continue
 		}
 
-		imageTags, err := dockerRegistry.Tags(ctx, image.Path.Repository())
+		imageTags, err := dockerRegistry.Tags(ctx, image.Repository)
 		if err != nil {
 			return fmt.Errorf("fetch tags: %w", err)
 		}

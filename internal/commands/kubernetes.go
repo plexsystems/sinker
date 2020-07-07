@@ -26,19 +26,20 @@ func marshalImages(images []string, target Target) ([]SourceImage, error) {
 		imageReference = reference.TagNameOnly(imageReference)
 
 		imageRepository := reference.Path(imageReference)
-		imageVersion := strings.Split(imageReference.String(), ":")[1]
+		imageTag := strings.Split(imageReference.String(), ":")[1]
 
 		sourceHost := autoDetectSourceRegistry(imageRepository)
 
 		rawPath := sourceHost + "/" + imageRepository
-		rawPath = strings.ReplaceAll(rawPath, target.Path.Repository()+"/", "")
+		rawPath = strings.ReplaceAll(rawPath, target.Repository+"/", "")
 		rawPath = strings.ReplaceAll(rawPath, "docker.io/", "")
 
 		path := Path(rawPath)
 
 		sourceImage := SourceImage{
-			Path:    path,
-			Version: imageVersion,
+			Host:       path.Host(),
+			Repository: path.Repository(),
+			Tag:        imageTag,
 		}
 
 		containerImages = append(containerImages, sourceImage)
@@ -109,16 +110,6 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	}
 
 	return yamlFiles, nil
-}
-
-func contains(images []string, image string) bool {
-	for _, currentImage := range images {
-		if strings.EqualFold(currentImage, image) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func dedupeImages(images []string) []string {
