@@ -14,48 +14,85 @@ const manifestFileName = ".images.yaml"
 
 // Manifest is a collection of images to sync
 type Manifest struct {
-	Target Registry         `yaml:"target"`
-	Images []ContainerImage `yaml:"images,omitempty"`
+	Target Target        `yaml:"target"`
+	Images []SourceImage `yaml:"sources,omitempty"`
 }
 
-// Registry is the registry and repository to sync images to
-type Registry struct {
-	Host       string `yaml:"host"`
-	Repository string `yaml:"repository,omitempty"`
-	Auth       Auth   `yaml:"auth,omitempty"`
+// Target ...
+type Target struct {
+	Path Path `yaml:"path"`
+	Auth Auth `yaml:"auth,omitempty"`
 }
 
-func (r Registry) String() string {
-	if r.Repository == "" {
-		return r.Host
+// Path is the registry and repository to sync images to
+type Path string
+
+func (p Path) String() string {
+	return string(p)
+}
+
+// Host is the host of the registry
+func (p Path) Host() string {
+	if !strings.Contains(string(p), "/") {
+		return ""
 	}
 
-	return r.Host + "/" + r.Repository
+	hostTokens := strings.Split(string(p), "/")
+
+	return hostTokens[0]
 }
 
-// ContainerImage is a container image
-type ContainerImage struct {
-	Source  Registry `yaml:"source,omitempty"`
-	Target  Registry `yaml:"target,omitempty"`
-	Version string   `yaml:"version"`
+// Repository is the repository of the registry
+func (p Path) Repository() string {
+	if p.Host() == "" {
+		return string(p)
+	}
+
+	return strings.ReplaceAll(string(p), p.Host()+"/", "")
 }
 
-// SourceImage returns the source image
-func (c ContainerImage) SourceImage() string {
-	if c.Source.Host == "docker.io" && !strings.Contains(c.Source.Repository, "/") {
-		return c.Source.Host + "/library/" + c.Source.Repository + ":" + c.Version
+// SourceImage is a container image
+type SourceImage struct {
+	Path    Path   `yaml:"path,omitempty"`
+	Target  Target `yaml:"target,omitempty"`
+	Version string `yaml:"version"`
+	Auth    Auth   `yaml:"auth,omitempty"`
+}
+
+// String returns the source image
+func (c SourceImage) String() string {
+	if c.Version == "" {
+		return c.Path.String()
 	}
 
-	if c.Source.Host == "" {
-		return c.Source.Repository + ":" + c.Version
-	}
-
-	return c.Source.Host + "/" + c.Source.Repository + ":" + c.Version
+	return c.Path.String() + ":" + c.Version
 }
 
 // TargetImage returns the target image
-func (c ContainerImage) TargetImage() string {
-	return c.Target.String() + "/" + c.Source.Repository + ":" + c.Version
+func (c SourceImage) TargetImage() string {
+	var target string
+
+	if c.Version != "" {
+		target = ":" + c.Version
+	} else {
+		target = ":latest"
+	}
+
+	if c.Path.Repository() != "" {
+		target = "/" + c.Path.Repository() + target
+	}
+
+	if c.Target.Path.Repository() != "" {
+		target = "/" + c.Target.Path.Repository() + target
+	}
+
+	if c.Target.Path.Host() != "" {
+		target = "/" + c.Target.Path.Host() + target
+	}
+
+	target = strings.TrimLeft(target, "/")
+
+	return target
 }
 
 // Auth is a username and password to log into a registry
@@ -66,24 +103,12 @@ type Auth struct {
 
 // NewManifest returns a new image manifest
 func NewManifest(target string) Manifest {
-	var host string
-	var repository string
-
-	targetTokens := strings.Split(target, "/")
-	if len(targetTokens) > 1 {
-		host = targetTokens[0]
-		repository = strings.Join(targetTokens[1:], "/")
-	} else {
-		host = target
-	}
-
-	targetLocation := Registry{
-		Host:       host,
-		Repository: repository,
+	registry := Target{
+		Path: Path(target),
 	}
 
 	manifest := Manifest{
-		Target: targetLocation,
+		Target: registry,
 	}
 
 	return manifest
@@ -105,23 +130,32 @@ func NewAutodetectManifest(target string, path string) (Manifest, error) {
 
 // GetManifest returns the current manifest file in the working directory
 func GetManifest() (Manifest, error) {
-	imageManifestContents, err := ioutil.ReadFile(manifestFileName)
+	manifestContents, err := ioutil.ReadFile(manifestFileName)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
 	}
 
-	var currentImageManifest Manifest
-	if err := yaml.Unmarshal(imageManifestContents, &currentImageManifest); err != nil {
+	manifest, err := marshalManifest(manifestContents)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("marshal manifest: %w", err)
+	}
+
+	return manifest, nil
+}
+
+func marshalManifest(manifestContents []byte) (Manifest, error) {
+	var manifest Manifest
+	if err := yaml.Unmarshal(manifestContents, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
 	}
 
-	for i := range currentImageManifest.Images {
-		if currentImageManifest.Images[i].Target.Host == "" {
-			currentImageManifest.Images[i].Target = currentImageManifest.Target
+	for i := range manifest.Images {
+		if manifest.Images[i].Target.Path == "" {
+			manifest.Images[i].Target = manifest.Target
 		}
 	}
 
-	return currentImageManifest, nil
+	return manifest, nil
 }
 
 // WriteManifest writes the image manifest to disk

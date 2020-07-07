@@ -16,8 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func marshalImages(images []string, target Registry) ([]ContainerImage, error) {
-	var containerImages []ContainerImage
+func marshalImages(images []string, target Target) ([]SourceImage, error) {
+	var containerImages []SourceImage
 	for _, image := range images {
 		imageReference, err := reference.ParseNormalizedNamed(image)
 		if err != nil {
@@ -26,28 +26,22 @@ func marshalImages(images []string, target Registry) ([]ContainerImage, error) {
 		imageReference = reference.TagNameOnly(imageReference)
 
 		imageRepository := reference.Path(imageReference)
-		if target.Repository != "" {
-			imageRepository = strings.Replace(imageRepository, target.Repository+"/", "", 1)
-			imageRepository = strings.Replace(imageRepository, "library/", "", 1)
-		} else {
-			imageRepository = strings.Replace(imageRepository, target.Repository, "", 1)
-		}
-
 		imageVersion := strings.Split(imageReference.String(), ":")[1]
 
 		sourceHost := autoDetectSourceRegistry(imageRepository)
 
-		registry := Registry{
-			Host: sourceHost,
-		}
+		rawPath := sourceHost + "/" + imageRepository
+		rawPath = strings.ReplaceAll(rawPath, target.Path.Repository()+"/", "")
+		rawPath = strings.ReplaceAll(rawPath, "docker.io/", "")
 
-		containerImage := ContainerImage{
-			Source:  registry,
+		path := Path(rawPath)
+
+		sourceImage := SourceImage{
+			Path:    path,
 			Version: imageVersion,
-			Target:  target,
 		}
 
-		containerImages = append(containerImages, containerImage)
+		containerImages = append(containerImages, sourceImage)
 	}
 
 	return containerImages, nil
@@ -148,7 +142,7 @@ func doSplit(data []byte) [][]byte {
 	return bytes.Split(data, []byte(linebreak+"---"+linebreak))
 }
 
-func getFromKubernetesManifests(path string, registry Registry) ([]ContainerImage, error) {
+func getFromKubernetesManifests(path string, target Target) ([]SourceImage, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -234,7 +228,7 @@ func getFromKubernetesManifests(path string, registry Registry) ([]ContainerImag
 	}
 
 	dedupedImageList := dedupeImages(imageList)
-	marshalledImages, err := marshalImages(dedupedImageList, registry)
+	marshalledImages, err := marshalImages(dedupedImageList, target)
 	if err != nil {
 		return nil, fmt.Errorf("marshal images: %w", err)
 	}

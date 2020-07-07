@@ -50,20 +50,20 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	logger.Println("Finding images that do not exist at target registry ...")
 
-	auth, err := getAuthForHost(manifest.Target.Host)
+	auth, err := getAuthForHost(manifest.Target.Path.Host())
 	if err != nil {
 		return fmt.Errorf("get host auth: %w", err)
 	}
 
-	var unsyncedImages []ContainerImage
+	var unsyncedImages []SourceImage
 	for _, image := range manifest.Images {
-		exists, err := client.imageExistsAtRemote(ctx, image.Target.Host, auth)
+		exists, err := client.imageExistsAtRemote(ctx, image.Target.Path.Host(), auth)
 		if err != nil {
 			return fmt.Errorf("checking remote target image: %w", err)
 		}
 
 		if !exists {
-			logger.Printf("Image %s needs to be synced", image.SourceImage())
+			logger.Printf("Image %s needs to be synced", image.String())
 			unsyncedImages = append(unsyncedImages, image)
 		}
 	}
@@ -75,30 +75,30 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	if viper.GetBool("dryrun") {
 		for _, image := range unsyncedImages {
-			logger.Printf("Image %s would be pushed as %s", image.SourceImage(), image.TargetImage())
+			logger.Printf("Image %s would be pushed as %s", image.String(), image.TargetImage())
 		}
 		return nil
 	}
 
 	for _, image := range unsyncedImages {
-		auth, err := getAuthForRegistry(image.Source)
+		auth, err := getSourceImageAuth(image)
 		if err != nil {
 			return fmt.Errorf("get host auth: %w", err)
 		}
 
-		if err := client.PullImage(ctx, image.SourceImage(), auth); err != nil {
+		if err := client.PullImage(ctx, image.String(), auth); err != nil {
 			return fmt.Errorf("pullinh image: %w", err)
 		}
 	}
 
 	for _, image := range unsyncedImages {
-		if err := client.DockerClient.ImageTag(ctx, image.SourceImage(), image.TargetImage()); err != nil {
+		if err := client.DockerClient.ImageTag(ctx, image.String(), image.TargetImage()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
 	for _, image := range unsyncedImages {
-		auth, err := getAuthForRegistry(image.Target)
+		auth, err := getSourceImageAuth(image)
 		if err != nil {
 			return fmt.Errorf("get host auth: %w", err)
 		}

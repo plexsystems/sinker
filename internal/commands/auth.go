@@ -10,10 +10,10 @@ import (
 	"github.com/docker/cli/cli/config/credentials"
 )
 
-func getAuthForRegistry(registry Registry) (string, error) {
-	if registry.Auth.Password != "" {
-		username := os.Getenv(registry.Auth.Username)
-		password := os.Getenv(registry.Auth.Password)
+func getSourceImageAuth(image SourceImage) (string, error) {
+	if image.Auth.Password != "" {
+		username := os.Getenv(image.Auth.Username)
+		password := os.Getenv(image.Auth.Password)
 
 		authConfig := Auth{
 			Username: username,
@@ -28,7 +28,7 @@ func getAuthForRegistry(registry Registry) (string, error) {
 		return base64.URLEncoding.EncodeToString(jsonAuth), nil
 	}
 
-	auth, err := getAuthForHost(registry.Host)
+	auth, err := getAuthForHost(image.Path.Host())
 	if err != nil {
 		return "", fmt.Errorf("get auth for host: %w", err)
 	}
@@ -37,8 +37,8 @@ func getAuthForRegistry(registry Registry) (string, error) {
 }
 
 func getAuthForHost(host string) (string, error) {
-	if host == "" {
-		host = "https://index.docker.io/v2/"
+	if host == "" || host == "docker.io" {
+		host = "https://index.docker.io/v1/"
 	}
 
 	cfg, err := config.Load(config.Dir())

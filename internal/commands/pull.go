@@ -17,7 +17,12 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runPullCommand(ctx, logger, args[0]); err != nil {
+			var location string
+			if len(args) > 0 {
+				location = args[0]
+			}
+
+			if err := runPullCommand(ctx, logger, location); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -44,17 +49,14 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string) er
 	}
 
 	for _, image := range manifest.Images {
-		var registry Registry
 		var pullImage string
-		if location == "source" {
-			registry = image.Source
-			pullImage = image.SourceImage()
-		} else {
-			registry = image.Target
+		if location == "target" {
 			pullImage = image.TargetImage()
+		} else {
+			pullImage = image.String()
 		}
 
-		auth, err := getAuthForRegistry(registry)
+		auth, err := getSourceImageAuth(image)
 		if err != nil {
 			return fmt.Errorf("get auth: %w", err)
 		}

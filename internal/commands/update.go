@@ -39,7 +39,7 @@ func runUpdateCommand(path string) error {
 
 	var target string
 	if viper.GetString("target") == "" {
-		target = currentManifest.Target.String()
+		target = currentManifest.Target.Path.String()
 	} else {
 		target = viper.GetString("target")
 	}
@@ -49,12 +49,13 @@ func runUpdateCommand(path string) error {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	var updatedImages []ContainerImage
+	var updatedImages []SourceImage
 	for _, updatedImage := range updatedManifest.Images {
 		for _, currentImage := range currentManifest.Images {
-			if currentImage.Source.Repository == updatedImage.Source.Repository {
-				updatedImage.Source = currentImage.Source
+			if currentImage.Path.Repository() == updatedImage.Path.Repository() {
+				updatedImage.Path = currentImage.Path
 				updatedImage.Target = currentImage.Target
+				updatedImage.Auth = currentImage.Auth
 			}
 		}
 
