@@ -1,0 +1,15 @@
+target:
+  host: mycompany.com
+  repository: myteam
+sources:
+- repository: coreos/prometheus-operator
+  host: quay.io
+  tag: v0.40.0
+- repository: jimmidyson/configmap-reload
+  tag: v0.3.0
+  auth:
+    username: DOCKER_USER_ENV
+    password: DOCKER_PASSWORD_ENV
+- repository: coreos/prometheus-config-reloader
+  host: quay.io
+  tag: v0.40.0
