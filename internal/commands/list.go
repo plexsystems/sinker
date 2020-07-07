@@ -13,7 +13,7 @@ func newListCommand() *cobra.Command {
 		Use:       "list <source|target>",
 		Short:     "List the images found in the image manifest",
 		Args:      cobra.OnlyValidArgs,
-		ValidArgs: []string{"", "source", "target"},
+		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
@@ -25,7 +25,7 @@ func newListCommand() *cobra.Command {
 				location = args[0]
 			}
 
-			if err := runListCommand(".", location); err != nil {
+			if err := runListCommand(location); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
 
@@ -38,7 +38,7 @@ func newListCommand() *cobra.Command {
 	return &cmd
 }
 
-func runListCommand(path string, location string) error {
+func runListCommand(location string) error {
 	manifest, err := GetManifest()
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
@@ -46,10 +46,10 @@ func runListCommand(path string, location string) error {
 
 	var listImages []string
 	for _, image := range manifest.Images {
-		if location == "source" {
-			listImages = append(listImages, image.Source())
+		if location == "target" {
+			listImages = append(listImages, image.TargetImage())
 		} else {
-			listImages = append(listImages, image.Target(manifest.Target))
+			listImages = append(listImages, image.String())
 		}
 	}
 

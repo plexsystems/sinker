@@ -4,141 +4,82 @@ import (
 	"testing"
 )
 
-func TestNewManifest_NoRepository_EmptyRepository(t *testing.T) {
-	const expectedRegistry = "registry.com"
-	manifest := NewManifest("registry.com")
+func TestTarget_NoRepository_EmptyRepository(t *testing.T) {
+	const expected = "target.com"
 
-	if manifest.Target.Registry != expectedRegistry {
-		t.Errorf("expected target registry url %s, actual %s", expectedRegistry, manifest.Target.Registry)
-	}
-
-	if manifest.Target.Repository != "" {
-		t.Errorf("expected target registry url to be blank, actual %s", manifest.Target.Registry)
-	}
-}
-
-func TestNewManifest_WithRepository_SetsRepository(t *testing.T) {
-	const expectedRegistry = "registry.com"
-	const expectedRepository = "repo"
-	manifest := NewManifest("registry.com/repo")
-
-	if manifest.Target.Repository != expectedRepository {
-		t.Errorf("expected target registry url %s, actual %s", expectedRepository, manifest.Target.Repository)
-	}
-}
-
-func TestTarget_WithoutRepository(t *testing.T) {
 	target := Target{
-		Registry: "registry.com",
+		Host: expected,
 	}
 
-	const expectedTarget = "registry.com"
-	if target.String() != expectedTarget {
-		t.Errorf("expected target %s, actual %s", expectedTarget, target.String())
+	if target.String() != expected {
+		t.Errorf("expected target to be %s, actual %s", expected, target.String())
 	}
 }
 
-func TestTarget_WithRepository(t *testing.T) {
+func TestTarget_NoRepository_ReturnsRepository(t *testing.T) {
+	const expected = "target.com/repo"
 	target := Target{
-		Registry:   "registry.com",
+		Host:       "target.com",
 		Repository: "repo",
 	}
 
-	const expectedTarget = "registry.com/repo"
-	if target.String() != expectedTarget {
-		t.Errorf("expected target %s, actual %s", expectedTarget, target.String())
+	if target.String() != expected {
+		t.Errorf("expected target to be %s, actual %s", expected, target.String())
 	}
 }
 
-func TestContainerImage_DockerRegistry(t *testing.T) {
-	libraryImage := ContainerImage{
-		Repository:     "repo",
-		Version:        "v1.0.0",
-		SourceRegistry: "docker.io",
+func TestPath_NoRepository_EmptyRepository(t *testing.T) {
+	const expected = "repo"
+	path := Path(expected)
+
+	if path.Host() != "" {
+		t.Errorf("expected path host to be blank, actual %s", path.Host())
 	}
 
-	image := ContainerImage{
-		Repository:     "foo/repo",
-		Version:        "v1.0.0",
-		SourceRegistry: "docker.io",
+	if path.Repository() != expected {
+		t.Errorf("expected registry repository to be blank, actual %s", path.Repository())
+	}
+}
+
+func TestPath_WithRepository_ReturnsRepository(t *testing.T) {
+	const expectedHost = "url.com"
+	const expectedRepository = "foo/bar"
+
+	path := Path("url.com/foo/bar")
+
+	if path.Host() != expectedHost {
+		t.Errorf("expected path host %s, actual %s", expectedHost, path.Host())
+	}
+
+	if path.Repository() != expectedRepository {
+		t.Errorf("expected path repository to be %s actual %s", expectedRepository, path.Repository())
+	}
+}
+
+func TestSourceImage(t *testing.T) {
+	image := SourceImage{
+		Host:       "quay.io",
+		Repository: "repo",
+		Tag:        "v1.0.0",
+	}
+
+	imageWithPath := SourceImage{
+		Host:       "quay.io",
+		Repository: "foo/repo",
+		Tag:        "v1.0.0",
 	}
 
 	target := Target{
-		Registry: "registry.com",
+		Host: "target.com",
 	}
 
 	targetWithRepository := Target{
-		Registry:   "registry.com",
+		Host:       "target.com",
 		Repository: "bar",
 	}
 
 	testCases := []struct {
-		image          ContainerImage
-		target         Target
-		expectedSource string
-		expectedTarget string
-	}{
-		{
-			libraryImage,
-			target,
-			"docker.io/library/repo:v1.0.0",
-			"registry.com/repo:v1.0.0",
-		},
-		{
-			libraryImage,
-			targetWithRepository,
-			"docker.io/library/repo:v1.0.0",
-			"registry.com/bar/repo:v1.0.0",
-		},
-		{
-			image,
-			target,
-			"docker.io/foo/repo:v1.0.0",
-			"registry.com/foo/repo:v1.0.0",
-		},
-		{
-			image,
-			targetWithRepository,
-			"docker.io/foo/repo:v1.0.0",
-			"registry.com/bar/foo/repo:v1.0.0",
-		},
-	}
-
-	for _, testCase := range testCases {
-		if testCase.image.Source() != testCase.expectedSource {
-			t.Errorf("expected source %s, actual %s", testCase.expectedSource, testCase.image.Source())
-		}
-
-		if testCase.image.Target(testCase.target) != testCase.expectedTarget {
-			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.Target(testCase.target))
-		}
-	}
-}
-
-func TestContainerImage_NonDockerRegistry(t *testing.T) {
-	image := ContainerImage{
-		Repository:     "repo",
-		Version:        "v1.0.0",
-		SourceRegistry: "quay.io",
-	}
-
-	imageWithPath := ContainerImage{
-		Repository:     "foo/repo",
-		Version:        "v1.0.0",
-		SourceRegistry: "quay.io",
-	}
-
-	target := Target{
-		Registry: "registry.com",
-	}
-
-	targetWithRepository := Target{
-		Registry:   "registry.com",
-		Repository: "bar",
-	}
-
-	testCases := []struct {
-		image          ContainerImage
+		image          SourceImage
 		target         Target
 		expectedSource string
 		expectedTarget string
@@ -147,35 +88,37 @@ func TestContainerImage_NonDockerRegistry(t *testing.T) {
 			image,
 			target,
 			"quay.io/repo:v1.0.0",
-			"registry.com/repo:v1.0.0",
+			"target.com/repo:v1.0.0",
 		},
 		{
 			image,
 			targetWithRepository,
 			"quay.io/repo:v1.0.0",
-			"registry.com/bar/repo:v1.0.0",
+			"target.com/bar/repo:v1.0.0",
 		},
 		{
 			imageWithPath,
 			target,
 			"quay.io/foo/repo:v1.0.0",
-			"registry.com/foo/repo:v1.0.0",
+			"target.com/foo/repo:v1.0.0",
 		},
 		{
 			imageWithPath,
 			targetWithRepository,
 			"quay.io/foo/repo:v1.0.0",
-			"registry.com/bar/foo/repo:v1.0.0",
+			"target.com/bar/foo/repo:v1.0.0",
 		},
 	}
 
 	for _, testCase := range testCases {
-		if testCase.image.Source() != testCase.expectedSource {
-			t.Errorf("expected source %s, actual %s", testCase.expectedSource, testCase.image.Source())
+		testCase.image.Target = testCase.target
+
+		if testCase.image.String() != testCase.expectedSource {
+			t.Errorf("expected source %s, actual %s", testCase.expectedSource, testCase.image.String())
 		}
 
-		if testCase.image.Target(testCase.target) != testCase.expectedTarget {
-			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.Target(testCase.target))
+		if testCase.image.TargetImage() != testCase.expectedTarget {
+			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.TargetImage())
 		}
 	}
 }

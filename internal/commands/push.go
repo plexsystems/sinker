@@ -1,21 +1,13 @@
 package commands
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
@@ -42,7 +34,7 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 }
 
 func runPushCommand(ctx context.Context, logger *log.Logger, path string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	client, err := NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
@@ -56,16 +48,22 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 		return errors.New("no images found in the image manifest")
 	}
 
-	var unsyncedImages []ContainerImage
 	logger.Println("Finding images that do not exist at target registry ...")
+
+	var unsyncedImages []SourceImage
 	for _, image := range manifest.Images {
-		exists, err := imageExistsAtTarget(ctx, cli, image, manifest.Target)
+		auth, err := getEncodedTargetAuth(image.Target)
+		if err != nil {
+			return fmt.Errorf("get host auth: %w", err)
+		}
+
+		exists, err := client.imageExistsAtRemote(ctx, image.TargetImage(), auth)
 		if err != nil {
 			return fmt.Errorf("checking remote target image: %w", err)
 		}
 
 		if !exists {
-			logger.Printf("Image %s needs to be synced", image.Source())
+			logger.Printf("Image %s needs to be synced", image.String())
 			unsyncedImages = append(unsyncedImages, image)
 		}
 	}
@@ -77,23 +75,38 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 
 	if viper.GetBool("dryrun") {
 		for _, image := range unsyncedImages {
-			logger.Printf("Image %s would be pushed as %s", image.Source(), image.Target(manifest.Target))
+			logger.Printf("Image %s would be pushed as %s", image.String(), image.TargetImage())
 		}
 		return nil
 	}
 
-	if err := pullSourceImages(ctx, cli, logger, unsyncedImages); err != nil {
-		return fmt.Errorf("pull source images: %w", err)
+	for _, image := range unsyncedImages {
+		auth, err := getEncodedSourceAuth(image)
+		if err != nil {
+			return fmt.Errorf("get host auth: %w", err)
+		}
+
+		if err := client.PullImage(ctx, image.String(), auth); err != nil {
+			return fmt.Errorf("pulling image: %w", err)
+		}
 	}
 
 	for _, image := range unsyncedImages {
-		if err := cli.ImageTag(ctx, image.Source(), image.Target(manifest.Target)); err != nil {
+		if err := client.DockerClient.ImageTag(ctx, image.String(), image.TargetImage()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
 	for _, image := range unsyncedImages {
-		if err := pushImageToTargetAndWait(ctx, logger, cli, image, manifest.Target); err != nil {
+		auth, err := getEncodedTargetAuth(image.Target)
+		if err != nil {
+			return fmt.Errorf("get source auth: %w", err)
+		}
+
+		fmt.Println(auth)
+		fmt.Println(image.TargetImage())
+
+		if err := client.PushImage(ctx, image.TargetImage(), auth); err != nil {
 			return fmt.Errorf("pushing image to target: %w", err)
 		}
 	}
@@ -101,93 +114,4 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 	logger.Println("All images have been pushed.")
 
 	return nil
-}
-
-func imageExistsAtTarget(ctx context.Context, cli *client.Client, image ContainerImage, target Target) (bool, error) {
-	encodedAuth, err := getEncodedAuthForRegistry(target.Registry)
-	if err != nil {
-		return false, fmt.Errorf("get encoded auth: %w", err)
-	}
-
-	_, err = cli.ImagePull(ctx, image.Target(target), types.ImagePullOptions{
-		RegistryAuth: encodedAuth,
-	})
-
-	var notFoundError errdefs.ErrNotFound
-	if errors.As(err, &notFoundError) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("check image for existance: %w", err)
-	}
-
-	return true, nil
-}
-
-func pushImageToTargetAndWait(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, target Target) error {
-	encodedAuth, err := getEncodedAuthForRegistry(target.Registry)
-	if err != nil {
-		return fmt.Errorf("get encoded auth: %w", err)
-	}
-
-	reader, err := cli.ImagePush(ctx, image.Target(target), types.ImagePushOptions{
-		RegistryAuth: encodedAuth,
-	})
-	if err != nil {
-		return fmt.Errorf("pushing image: %w", err)
-	}
-	defer reader.Close()
-
-	// https://github.com/moby/moby/issues/36253
-	type ErrorMessage struct {
-		Error string
-	}
-
-	type StatusMessage struct {
-		Status string
-	}
-
-	var errorMessage ErrorMessage
-	var statusMessage StatusMessage
-	buffIOReader := bufio.NewReader(reader)
-
-	for {
-		streamBytes, err := buffIOReader.ReadBytes('\n')
-		if err == io.EOF {
-			break
-		}
-
-		if err := json.Unmarshal(streamBytes, &errorMessage); err != nil {
-			return fmt.Errorf("unmarshal error: %w", err)
-		}
-
-		if errorMessage.Error != "" {
-			return fmt.Errorf("pushing image after tag: %s", errorMessage.Error)
-		}
-
-		if err := json.Unmarshal(streamBytes, &statusMessage); err != nil {
-			return fmt.Errorf("unmarshal status: %w", err)
-		}
-
-		if statusMessage.Status == "Pushing" {
-			break
-		}
-	}
-
-	if err := waitForTargetImagePushed(ctx, logger, cli, image, target); err != nil {
-		return fmt.Errorf("waiting for push: %w", err)
-	}
-
-	return nil
-}
-
-func waitForTargetImagePushed(ctx context.Context, logger *log.Logger, cli *client.Client, image ContainerImage, target Target) error {
-	return wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
-		exists, err := imageExistsAtTarget(ctx, cli, image, target)
-		if err != nil {
-			return false, fmt.Errorf("checking image exists: %w", err)
-		}
-
-		logger.Printf("Pushing %s ...", image.Target(target))
-		return exists, nil
-	})
 }

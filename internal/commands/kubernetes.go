@@ -16,8 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func marshalImages(images []string, target Target) ([]ContainerImage, error) {
-	var containerImages []ContainerImage
+func marshalImages(images []string, target Target) ([]SourceImage, error) {
+	var containerImages []SourceImage
 	for _, image := range images {
 		imageReference, err := reference.ParseNormalizedNamed(image)
 		if err != nil {
@@ -26,24 +26,23 @@ func marshalImages(images []string, target Target) ([]ContainerImage, error) {
 		imageReference = reference.TagNameOnly(imageReference)
 
 		imageRepository := reference.Path(imageReference)
-		if target.Repository != "" {
-			imageRepository = strings.Replace(imageRepository, target.Repository+"/", "", 1)
-			imageRepository = strings.Replace(imageRepository, "library/", "", 1)
-		} else {
-			imageRepository = strings.Replace(imageRepository, target.Repository, "", 1)
+		imageTag := strings.Split(imageReference.String(), ":")[1]
+
+		sourceHost := autoDetectSourceRegistry(imageRepository)
+
+		rawPath := sourceHost + "/" + imageRepository
+		rawPath = strings.ReplaceAll(rawPath, target.Repository+"/", "")
+		rawPath = strings.ReplaceAll(rawPath, "docker.io/", "")
+
+		path := Path(rawPath)
+
+		sourceImage := SourceImage{
+			Host:       path.Host(),
+			Repository: path.Repository(),
+			Tag:        imageTag,
 		}
 
-		imageVersion := strings.Split(imageReference.String(), ":")[1]
-
-		sourceRegistry := autoDetectSourceRegistry(imageRepository)
-
-		containerImage := ContainerImage{
-			Repository:     imageRepository,
-			Version:        imageVersion,
-			SourceRegistry: sourceRegistry,
-		}
-
-		containerImages = append(containerImages, containerImage)
+		containerImages = append(containerImages, sourceImage)
 	}
 
 	return containerImages, nil
@@ -113,16 +112,6 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	return yamlFiles, nil
 }
 
-func contains(images []string, image string) bool {
-	for _, currentImage := range images {
-		if strings.EqualFold(currentImage, image) {
-			return true
-		}
-	}
-
-	return false
-}
-
 func dedupeImages(images []string) []string {
 	var dedupedImageList []string
 	for _, image := range images {
@@ -144,7 +133,7 @@ func doSplit(data []byte) [][]byte {
 	return bytes.Split(data, []byte(linebreak+"---"+linebreak))
 }
 
-func getFromKubernetesManifests(path string, target Target) ([]ContainerImage, error) {
+func getFromKubernetesManifests(path string, target Target) ([]SourceImage, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)

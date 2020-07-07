@@ -25,11 +25,11 @@ While the `create` and `update` commands assist with managing the image manifest
 
 ```yaml
 target:
-    registry: mycompany.com
-    repository: myteam
+  host: mycompany.com
+  repository: myteam
 ```
 
-The `target` section is where all of the images will be synced to. The above yaml would sync all images to the `mycompany` registry in the `myteam` repository: `mycompany.com/myteam/...`.
+The `target` section is where the images will be synced to. The above yaml would sync all images to the `myteam` repository hosted at `mycompany.com` (`mycompany.com/myteam/...`)
 
 The `repository` field is optional.
 
@@ -37,21 +37,20 @@ The `repository` field is optional.
 
 ```yaml
 target:
-    registry: mycompany.com
-    repository: myteam
-images:
-  - repository: coreos/prometheus-operator
-    version: v0.40.0
-    source: quay.io
-  - repository: jimmidyson/configmap-reload
-    version: v0.3.1
-    source: docker.io
-  - repository: super/secret
-    version: v1.0.0
-    source: privatecompany.org
-    auth:
-        username: USER_ENVIRONMENT_VARIABLE_NAME
-        password: PASSWORD_ENVIRONMENT_VARIABLE_NAME
+  host: mycompany.com
+  repository: myteam
+sources:
+- repository: coreos/prometheus-operator
+  host: quay.io
+  tag: v0.40.0
+- repository: super/secret
+  tag: v0.3.0
+  auth:
+    username: DOCKER_USER_ENV
+    password: DOCKER_PASSWORD_ENV
+- repository: coreos/prometheus-config-reloader
+  host: quay.io
+  tag: v0.40.0
 ```
 
 The images section includes the source registry and the repository for the image. During a sync, an image `push` would result in `mycompany.com/myteam/coreos/prometheus-operator:v0.40.0`
@@ -92,18 +91,17 @@ $ sinker create example/bundle.yaml --target mycompany.com/myteam
 
 ```yaml
 target:
-    registry: mycompany.com
-    repository: myteam
-images:
-  - repository: coreos/prometheus-operator
-    version: v0.40.0
-    source: quay.io
-  - repository: jimmidyson/configmap-reload
-    version: v0.3.1
-    source: docker.io
-  - repository: coreos/prometheus-config-reloader
-    version: v0.40.0
-    source: quay.io
+  host: mycompany.com
+  repository: myteam
+sources:
+- repository: coreos/prometheus-operator
+  host: quay.io
+  tag: v0.40.0
+- repository: jimmidyson/configmap-reload
+  tag: v0.3.0
+- repository: coreos/prometheus-config-reloader
+  host: quay.io
+  tag: v0.40.0
 ```
 
 ### Push command
@@ -128,13 +126,17 @@ $ sinker update <file|directory>
 
 _NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)._
 
-#### --target flag (optional)
-
-If desired, you can set a new target in the image manifest by using --target during an update.
-
 ### Pull command
 
+Pulls the source or target images found in the image manifest.
+
+Pulling the `source` could be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
+
+<<<<<<< HEAD
+Pulling the `target` could be useful if you need to load the images into another environment, such as [Kind](https://github.com/kubernetes-sigs/kind)
+=======
 Pulls the source or target images found in the image manifest. Pulling from source can be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
+>>>>>>> 7723b6a7411d355ad72c53262ab41a1bef9f9850
 
 ```shell
 $ sinker pull <source|target>

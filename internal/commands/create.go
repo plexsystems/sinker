@@ -44,7 +44,6 @@ func runCreateCommand(path string) error {
 
 	var err error
 	var manifest Manifest
-
 	if path == "" {
 		manifest = NewManifest(viper.GetString("target"))
 	} else {
