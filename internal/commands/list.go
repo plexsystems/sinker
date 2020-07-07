@@ -25,7 +25,8 @@ func newListCommand() *cobra.Command {
 				location = args[0]
 			}
 
-			if err := runListCommand(location); err != nil {
+			manifestDirectory := viper.GetString("manifest")
+			if err := runListCommand(location, manifestDirectory); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
 
@@ -38,8 +39,8 @@ func newListCommand() *cobra.Command {
 	return &cmd
 }
 
-func runListCommand(location string) error {
-	manifest, err := GetManifest()
+func runListCommand(location string, directory string) error {
+	manifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}

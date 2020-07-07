@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // NewDefaultCommand creates a new default command
@@ -15,8 +16,11 @@ func NewDefaultCommand() *cobra.Command {
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
 		Long:    "A CLI tool to sync container images to another registry",
-		Version: "0.6.0",
+		Version: "0.8.1",
 	}
+
+	cmd.PersistentFlags().StringP("manifest", "m", "", "Directory where the manifest file is (defaults to current directory)")
+	viper.BindPFlag("manifest", cmd.PersistentFlags().Lookup("manifest"))
 
 	ctx := context.Background()
 	logger := log.New(os.Stdout, "", log.LstdFlags)

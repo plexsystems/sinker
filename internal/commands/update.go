@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func newUpdateCommand() *cobra.Command {
@@ -13,7 +14,9 @@ func newUpdateCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runUpdateCommand(args[0]); err != nil {
+			manifestDirectory := viper.GetString("manifest")
+
+			if err := runUpdateCommand(args[0], manifestDirectory); err != nil {
 				return fmt.Errorf("update: %w", err)
 			}
 
@@ -24,8 +27,8 @@ func newUpdateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runUpdateCommand(path string) error {
-	currentManifest, err := GetManifest()
+func runUpdateCommand(path string, directory string) error {
+	currentManifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
@@ -47,7 +50,7 @@ func runUpdateCommand(path string) error {
 		}
 	}
 
-	if err := WriteManifest(updatedManifest); err != nil {
+	if err := writeManifest(updatedManifest, directory); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

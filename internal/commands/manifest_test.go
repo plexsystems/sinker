@@ -69,6 +69,11 @@ func TestSourceImage(t *testing.T) {
 		Tag:        "v1.0.0",
 	}
 
+	imageWithoutTag := SourceImage{
+		Host:       "quay.io",
+		Repository: "repo",
+	}
+
 	target := Target{
 		Host: "target.com",
 	}
@@ -107,6 +112,12 @@ func TestSourceImage(t *testing.T) {
 			targetWithRepository,
 			"quay.io/foo/repo:v1.0.0",
 			"target.com/bar/foo/repo:v1.0.0",
+		},
+		{
+			imageWithoutTag,
+			target,
+			"quay.io/repo",
+			"target.com/repo",
 		},
 	}
 

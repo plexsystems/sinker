@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
@@ -21,7 +22,9 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			if len(args) > 0 {
 				location = args[0]
 			}
-			if err := runPullCommand(ctx, logger, location); err != nil {
+
+			manifestDirectory := viper.GetString("manifest")
+			if err := runPullCommand(ctx, logger, location, manifestDirectory); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -32,13 +35,13 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(ctx context.Context, logger *log.Logger, location string) error {
+func runPullCommand(ctx context.Context, logger *log.Logger, location string, directory string) error {
 	client, err := NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := GetManifest()
+	manifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}

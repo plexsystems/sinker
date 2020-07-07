@@ -20,7 +20,8 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
-			if err := runPushCommand(ctx, logger, "."); err != nil {
+			manifestDirectory := viper.GetString("manifest")
+			if err := runPushCommand(ctx, logger, manifestDirectory); err != nil {
 				return fmt.Errorf("push: %w", err)
 			}
 
@@ -33,13 +34,13 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPushCommand(ctx context.Context, logger *log.Logger, path string) error {
+func runPushCommand(ctx context.Context, logger *log.Logger, directory string) error {
 	client, err := NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	manifest, err := GetManifest()
+	manifest, err := GetManifest(directory)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
@@ -102,9 +103,6 @@ func runPushCommand(ctx context.Context, logger *log.Logger, path string) error 
 		if err != nil {
 			return fmt.Errorf("get source auth: %w", err)
 		}
-
-		fmt.Println(auth)
-		fmt.Println(image.TargetImage())
 
 		if err := client.PushImage(ctx, image.TargetImage(), auth); err != nil {
 			return fmt.Errorf("pushing image to target: %w", err)
