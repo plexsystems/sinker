@@ -62,8 +62,16 @@ In both the `target` and `sources` section, the `host` field is _optional_. When
 
 If you prefer to always set the host for Docker Hub, you must add the `library` repository for images that are not in a repository. For example `nginx`, which has no repository, should be added as:
 
-```text
-docker.io/library/nginx
+```yaml
+- repository: library/nginx
+  host: docker.io
+```
+
+Images with a repository do not need this library prefix
+
+```yaml
+- repository: jimmidyson/configmap-reload
+  host: docker.io
 ```
 
 #### Auth
