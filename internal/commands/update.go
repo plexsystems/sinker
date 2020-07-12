@@ -14,9 +14,10 @@ func newUpdateCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			sourcePath := args[0]
 			manifestDirectory := viper.GetString("manifest")
 
-			if err := runUpdateCommand(args[0], manifestDirectory); err != nil {
+			if err := runUpdateCommand(sourcePath, manifestDirectory); err != nil {
 				return fmt.Errorf("update: %w", err)
 			}
 

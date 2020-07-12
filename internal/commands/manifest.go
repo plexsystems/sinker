@@ -78,6 +78,7 @@ type SourceImage struct {
 	Host       string `yaml:"host,omitempty"`
 	Target     Target `yaml:"target,omitempty"`
 	Tag        string `yaml:"tag,omitempty"`
+	Digest     string `yaml:"digest,omitempty"`
 	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
@@ -86,6 +87,8 @@ func (c SourceImage) String() string {
 	var source string
 	if c.Tag != "" {
 		source = ":" + c.Tag
+	} else if c.Digest != "" {
+		source = "@" + c.Digest
 	}
 
 	if c.Repository != "" {
@@ -106,6 +109,9 @@ func (c SourceImage) TargetImage() string {
 	var target string
 	if c.Tag != "" {
 		target = ":" + c.Tag
+	} else if c.Digest != "" {
+		target = strings.ReplaceAll(c.Digest, "sha256:", "")
+		target = ":" + target
 	}
 
 	if c.Repository != "" {

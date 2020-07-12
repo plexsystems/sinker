@@ -1,8 +1,6 @@
 package commands
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestTarget_NoRepository_EmptyRepository(t *testing.T) {
 	const expected = "target.com"
@@ -56,22 +54,10 @@ func TestPath_WithRepository_ReturnsRepository(t *testing.T) {
 	}
 }
 
-func TestSourceImage(t *testing.T) {
+func TestSourceImage_WithoutRepository(t *testing.T) {
 	image := SourceImage{
-		Host:       "quay.io",
-		Repository: "repo",
-		Tag:        "v1.0.0",
-	}
-
-	imageWithPath := SourceImage{
-		Host:       "quay.io",
-		Repository: "foo/repo",
-		Tag:        "v1.0.0",
-	}
-
-	imageWithoutTag := SourceImage{
-		Host:       "quay.io",
-		Repository: "repo",
+		Host: "source.com",
+		Tag:  "v1.0.0",
 	}
 
 	target := Target{
@@ -92,32 +78,14 @@ func TestSourceImage(t *testing.T) {
 		{
 			image,
 			target,
-			"quay.io/repo:v1.0.0",
-			"target.com/repo:v1.0.0",
+			"source.com:v1.0.0",
+			"target.com:v1.0.0",
 		},
 		{
 			image,
 			targetWithRepository,
-			"quay.io/repo:v1.0.0",
-			"target.com/bar/repo:v1.0.0",
-		},
-		{
-			imageWithPath,
-			target,
-			"quay.io/foo/repo:v1.0.0",
-			"target.com/foo/repo:v1.0.0",
-		},
-		{
-			imageWithPath,
-			targetWithRepository,
-			"quay.io/foo/repo:v1.0.0",
-			"target.com/bar/foo/repo:v1.0.0",
-		},
-		{
-			imageWithoutTag,
-			target,
-			"quay.io/repo",
-			"target.com/repo",
+			"source.com:v1.0.0",
+			"target.com/bar:v1.0.0",
 		},
 	}
 
@@ -131,5 +99,127 @@ func TestSourceImage(t *testing.T) {
 		if testCase.image.TargetImage() != testCase.expectedTarget {
 			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.TargetImage())
 		}
+	}
+}
+
+func TestSourceImage_WithRepository(t *testing.T) {
+	image := SourceImage{
+		Host:       "source.com",
+		Repository: "repo",
+		Tag:        "v1.0.0",
+	}
+
+	target := Target{
+		Host: "target.com",
+	}
+
+	targetWithRepository := Target{
+		Host:       "target.com",
+		Repository: "bar",
+	}
+
+	testCases := []struct {
+		image          SourceImage
+		target         Target
+		expectedSource string
+		expectedTarget string
+	}{
+		{
+			image,
+			target,
+			"source.com/repo:v1.0.0",
+			"target.com/repo:v1.0.0",
+		},
+		{
+			image,
+			targetWithRepository,
+			"source.com/repo:v1.0.0",
+			"target.com/bar/repo:v1.0.0",
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase.image.Target = testCase.target
+
+		if testCase.image.String() != testCase.expectedSource {
+			t.Errorf("expected source %s, actual %s", testCase.expectedSource, testCase.image.String())
+		}
+
+		if testCase.image.TargetImage() != testCase.expectedTarget {
+			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.TargetImage())
+		}
+	}
+}
+
+func TestSourceImage_WithNestedRepository(t *testing.T) {
+	image := SourceImage{
+		Host:       "source.com",
+		Repository: "repo/foo",
+		Tag:        "v1.0.0",
+	}
+
+	target := Target{
+		Host: "target.com",
+	}
+
+	targetWithRepository := Target{
+		Host:       "target.com",
+		Repository: "bar",
+	}
+
+	testCases := []struct {
+		image          SourceImage
+		target         Target
+		expectedSource string
+		expectedTarget string
+	}{
+		{
+			image,
+			target,
+			"source.com/repo/foo:v1.0.0",
+			"target.com/repo/foo:v1.0.0",
+		},
+		{
+			image,
+			targetWithRepository,
+			"source.com/repo/foo:v1.0.0",
+			"target.com/bar/repo/foo:v1.0.0",
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase.image.Target = testCase.target
+
+		if testCase.image.String() != testCase.expectedSource {
+			t.Errorf("expected source %s, actual %s", testCase.expectedSource, testCase.image.String())
+		}
+
+		if testCase.image.TargetImage() != testCase.expectedTarget {
+			t.Errorf("expected target %s, actual %s", testCase.expectedTarget, testCase.image.TargetImage())
+		}
+	}
+}
+
+func TestSourceImage_Digest(t *testing.T) {
+	image := SourceImage{
+		Host:       "source.com",
+		Repository: "repo",
+		Digest:     "sha256:123",
+	}
+
+	target := Target{
+		Host: "target.com",
+	}
+
+	image.Target = target
+
+	const expectedSource = "source.com/repo@sha256:123"
+	if image.String() != expectedSource {
+		t.Errorf("unexpected source string. expected %s, actual %s", image.String(), expectedSource)
+	}
+
+	const expectedTarget = "target.com/repo:123"
+	if image.TargetImage() != expectedTarget {
+		t.Errorf("unexpected target string. expected %s, actual %s", image.TargetImage(), expectedTarget)
 	}
 }
