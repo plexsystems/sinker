@@ -1,0 +1,5 @@
+target:
+  repository: plexsystems
+sources:
+- repository: sandbox-operator
+  tag: v0.1.0

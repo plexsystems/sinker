@@ -29,7 +29,7 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("dryrun", false, "Print a list of images that would be synced during a push")
+	cmd.Flags().Bool("dryrun", false, "Print a list of images that would be pushed to the target")
 
 	return &cmd
 }
@@ -58,13 +58,12 @@ func runPushCommand(ctx context.Context, logger *log.Logger, directory string) e
 			return fmt.Errorf("get host auth: %w", err)
 		}
 
-		exists, err := client.imageExistsAtRemote(ctx, image.TargetImage(), auth)
+		exists, err := client.ImageExistsAtRemote(ctx, image.TargetImage(), auth)
 		if err != nil {
 			return fmt.Errorf("checking remote target image: %w", err)
 		}
 
 		if !exists {
-			logger.Printf("Image %s needs to be synced", image.String())
 			unsyncedImages = append(unsyncedImages, image)
 		}
 	}
@@ -87,7 +86,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, directory string) e
 			return fmt.Errorf("get host auth: %w", err)
 		}
 
-		if err := client.PullImage(ctx, image.String(), auth); err != nil {
+		if err := client.PullImageAndWait(ctx, image.String(), auth); err != nil {
 			return fmt.Errorf("pulling image: %w", err)
 		}
 	}
@@ -104,12 +103,12 @@ func runPushCommand(ctx context.Context, logger *log.Logger, directory string) e
 			return fmt.Errorf("get source auth: %w", err)
 		}
 
-		if err := client.PushImage(ctx, image.TargetImage(), auth); err != nil {
+		if err := client.PushImageAndWait(ctx, image.TargetImage(), auth); err != nil {
 			return fmt.Errorf("pushing image to target: %w", err)
 		}
 	}
 
-	logger.Println("All images have been pushed.")
+	client.Logger.Println("All images have been pushed!")
 
 	return nil
 }

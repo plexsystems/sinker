@@ -65,12 +65,12 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, di
 			return fmt.Errorf("getting %s auth: %w", location, err)
 		}
 
-		if err := client.PullImage(ctx, pullImage, auth); err != nil {
+		if err := client.PullImageAndWait(ctx, pullImage, auth); err != nil {
 			return fmt.Errorf("pull image: %w", err)
 		}
 	}
 
-	client.Logger.Println("All images pulled!")
+	client.Logger.Println("All images have been pulled!")
 
 	return nil
 }

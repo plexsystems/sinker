@@ -244,3 +244,13 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 
 	return images
 }
+
+func contains(images []string, image string) bool {
+	for _, currentImage := range images {
+		if strings.EqualFold(currentImage, image) {
+			return true
+		}
+	}
+
+	return false
+}
