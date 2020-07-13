@@ -17,6 +17,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+var (
+	pollInterval = 5 * time.Second
+	waitTime     = 5 * time.Minute
+)
+
 // Client is a Docker client with a logger
 type Client struct {
 	DockerClient *client.Client
@@ -44,29 +49,14 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 		RegistryAuth: auth,
 	}
 
-	var exists bool
-	images, err := c.ListAllImages(ctx)
-	if err != nil {
-		return fmt.Errorf("list all tags: %w", err)
-	}
-
-	for _, currentImage := range images {
-		if strings.EqualFold(currentImage, image) {
-			exists = true
-		}
-	}
-
-	if exists {
-		return nil
-	}
-
 	reader, err := c.DockerClient.ImagePull(ctx, image, opts)
 	if err != nil {
 		return fmt.Errorf("image pull: %w", err)
 	}
+	clientByteReader := bufio.NewReader(reader)
 
-	if err := c.waitForImagePulled(ctx, image); err != nil {
-		return fmt.Errorf("waiting for push: %w", err)
+	if err := c.waitForImagePulled(ctx, clientByteReader, image); err != nil {
+		return fmt.Errorf("waiting for pull: %w", err)
 	}
 
 	if err := reader.Close(); err != nil {
@@ -76,45 +66,22 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 	return nil
 }
 
-func (c Client) imageExistsOnHost(ctx context.Context, image string) (bool, error) {
-	imageList, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("image list: %w", err)
-	}
-
-	// When an image is sourced from docker hub, the image tag does
-	// not include docker.io (or library) on the local machine
-	image = strings.ReplaceAll(image, "docker.io/library/", "")
-	image = strings.ReplaceAll(image, "docker.io/", "")
-
-	for _, imageSummary := range imageList {
-		var searchList []string
-		if strings.Contains(image, "@") {
-			searchList = imageSummary.RepoDigests
-		} else {
-			searchList = imageSummary.RepoTags
-		}
-
-		for _, currentImage := range searchList {
-			if currentImage == image {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (c Client) waitForImagePulled(ctx context.Context, image string) error {
-	return wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		c.Logger.Printf("Pulling %s ...", image)
-
-		exists, err := c.imageExistsOnHost(ctx, image)
+func (c Client) waitForImagePulled(ctx context.Context, clientByteReader *bufio.Reader, image string) error {
+	return wait.PollImmediate(pollInterval, waitTime, func() (bool, error) {
+		status, err := parseReader(c.Logger, clientByteReader)
 		if err != nil {
-			return false, fmt.Errorf("local image check: %w", err)
+			return false, fmt.Errorf("reader: %w", err)
 		}
 
-		return exists, nil
+		fmt.Println(status)
+
+		if status.Message == "Pull complete" {
+			return true, nil
+		}
+
+		c.Logger.Printf("Pulling %s (%s) ...", image, getStatusString(status))
+
+		return false, nil
 	})
 }
 
@@ -143,7 +110,7 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 }
 
 func (c Client) waitForImagePushed(ctx context.Context, image string, auth string) error {
-	return wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(pollInterval, waitTime, func() (bool, error) {
 		c.Logger.Printf("Pushing %s ...", image)
 
 		exists, err := c.ImageExistsAtRemote(ctx, image, auth)
@@ -257,6 +224,71 @@ func waitForPushEvent(reader io.ReadCloser) error {
 	}
 
 	return nil
+}
+
+func parseReader(logger *log.Logger, clientByteReader *bufio.Reader) (Status, error) {
+	var errorMessage ErrorMessage
+	var status Status
+
+	completeStatus := Status{
+		Message: "Pull complete",
+	}
+
+	streamBytes, err := clientByteReader.ReadBytes('\n')
+	if err == io.EOF {
+		return completeStatus, nil
+	}
+
+	if err := json.Unmarshal(streamBytes, &status); err != nil {
+		return Status{}, fmt.Errorf("unmarshal status: %w", err)
+	}
+
+	if err := json.Unmarshal(streamBytes, &errorMessage); err != nil {
+		return Status{}, fmt.Errorf("unmarshal error: %w", err)
+	}
+
+	if errorMessage.Error != "" {
+		return Status{}, fmt.Errorf("returned error: %s", errorMessage.Error)
+	}
+
+	return status, nil
+}
+
+func getStatusString(status Status) string {
+	const defaultStatusMessage = "Processing"
+
+	if status.ProgressDetail.Total > 0 {
+		return fmt.Sprintf("Processing layer %vB of %vB", status.ProgressDetail.Current, status.ProgressDetail.Total)
+	}
+
+	if strings.Contains(status.Message, "Pulling from") {
+		return "Started"
+	}
+
+	if strings.Contains(status.Message, "Pulling fs") {
+		return fmt.Sprintf("Processing fs layer (trace ID %v)", status.ID)
+	}
+
+	if strings.Contains(status.Message, "Verifying") {
+		return "Verifying Checksum"
+	}
+
+	return defaultStatusMessage
+}
+
+type ErrorMessage struct {
+	Error string
+}
+
+type Status struct {
+	Message        string `json:"status"`
+	ID             string
+	ProgressDetail ProgressDetail
+}
+
+type ProgressDetail struct {
+	Current int
+	Total   int
 }
 
 func imageHasLatestTag(image string) bool {
