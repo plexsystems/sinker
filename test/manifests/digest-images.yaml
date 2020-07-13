@@ -1,0 +1,7 @@
+# This test pushes a known digest
+
+target:
+  repository: plexsystems
+sources:
+- repository: busybox
+  digest: sha256:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818bba84cd22c29 # busybox:1.30.0

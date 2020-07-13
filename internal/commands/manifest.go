@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/plexsystems/sinker/internal/docker"
+
 	"gopkg.in/yaml.v2"
 )
-
-const manifestFileName = ".images.yaml"
 
 // Manifest is a collection of images to sync
 type Manifest struct {
@@ -39,37 +39,6 @@ func (t Target) String() string {
 	target = strings.TrimLeft(target, "/")
 
 	return target
-}
-
-// Path is a registry host and repository
-type Path string
-
-func (p Path) String() string {
-	return string(p)
-}
-
-// Host is the host of the registry
-func (p Path) Host() string {
-	if !strings.Contains(string(p), "/") {
-		return ""
-	}
-
-	hostTokens := strings.Split(string(p), "/")
-
-	if !strings.Contains(hostTokens[0], ".") && !strings.Contains(hostTokens[0], ":") {
-		return ""
-	}
-
-	return hostTokens[0]
-}
-
-// Repository is the repository of the registry
-func (p Path) Repository() string {
-	if p.Host() == "" {
-		return string(p)
-	}
-
-	return strings.ReplaceAll(string(p), p.Host()+"/", "")
 }
 
 // SourceImage is a source container image
@@ -139,7 +108,7 @@ type Auth struct {
 
 // NewManifest returns a new image manifest
 func NewManifest(target string) Manifest {
-	targetPath := Path(target)
+	targetPath := docker.RegistryPath(target)
 
 	manifestTarget := Target{
 		Host:       targetPath.Host(),
@@ -168,8 +137,8 @@ func NewAutodetectManifest(target string, path string) (Manifest, error) {
 }
 
 // GetManifest returns the current manifest file in the working directory
-func GetManifest(directory string) (Manifest, error) {
-	manifestLocation := filepath.Join(directory, manifestFileName)
+func GetManifest(path string) (Manifest, error) {
+	manifestLocation := getManifestLocation(path)
 	manifestContents, err := ioutil.ReadFile(manifestLocation)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
@@ -198,17 +167,30 @@ func marshalManifest(manifestContents []byte) (Manifest, error) {
 	return manifest, nil
 }
 
-func writeManifest(manifest Manifest, directory string) error {
+func writeManifest(manifest Manifest, path string) error {
 	imageManifestContents, err := yaml.Marshal(&manifest)
 	if err != nil {
 		return fmt.Errorf("marshal image manifest: %w", err)
 	}
 	imageManifestContents = bytes.ReplaceAll(imageManifestContents, []byte(`"`), []byte(""))
 
-	manifestLocation := filepath.Join(directory, manifestFileName)
+	manifestLocation := getManifestLocation(path)
 	if err := ioutil.WriteFile(manifestLocation, imageManifestContents, os.ModePerm); err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
 
 	return nil
+}
+
+func getManifestLocation(path string) string {
+	const defaultManifestFileName = ".images.yaml"
+
+	var manifestLocation string
+	if strings.Contains(path, ".yaml") || strings.Contains(path, ".yml") {
+		manifestLocation = path
+	} else {
+		manifestLocation = filepath.Join(path, defaultManifestFileName)
+	}
+
+	return manifestLocation
 }

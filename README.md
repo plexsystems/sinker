@@ -17,8 +17,6 @@ Releases are also provided in the [releases](https://github.com/plexsystems/sink
 
 ## The image manifest
 
-All commands either create, update, or read from the image manifest (`.images.yaml`).
-
 While the `create` and `update` commands assist with managing the image manifest, the `push` command will not modify the image manifest. Allowing you to manually control the manifest if desired.
 
 ### The target section
@@ -47,7 +45,7 @@ sources:
     username: DOCKER_USER_ENV
     password: DOCKER_PASSWORD_ENV
 - repository: nginx
-  tag: 1.19
+  digest: sha256:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818bba84cd22c29
 ```
 
 The images section includes the host of the registry and the repository where the image is located. For example, the `prometheus-operator` would be pushed to:
@@ -56,23 +54,15 @@ The images section includes the host of the registry and the repository where th
 mycompany.com/myteam/coreos/prometheus-operator:v0.40.0
 ```
 
+When using `digests`, the image will be pushed with a tag matching the SHA of the digest:
+
+```text
+mycompany.com/myteam/nginx:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818bba84cd22c29
+```
+
 #### Optional host defaults to Docker Hub
 
 In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub (`docker.io`).
-
-If you prefer to always set the host for Docker Hub, you must add the `library` repository for images that are not in a repository. For example `nginx`, which has no repository, should be added as:
-
-```yaml
-- repository: library/nginx
-  host: docker.io
-```
-
-Images with a repository do not need this library prefix
-
-```yaml
-- repository: jimmidyson/configmap-reload
-  host: docker.io
-```
 
 #### Auth
 
@@ -82,7 +72,63 @@ In the event that an image that needs to be sync'd is in another registry, the `
 
 ## Usage
 
-All examples are taken from running commands in the `examples/` folder. To specify a different folder where the manifest exists use the `--manifest` flag (default is working directory)
+### Global flags
+
+#### --manifest
+
+Set the directory of the manifest file. Defaults to the working directory.
+
+### Push command
+
+Push all of the images inside of the image manifest to the target registry.
+
+```shell
+$ sinker push
+```
+
+#### --dryrun flag (optional)
+
+The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
+
+### Pull command
+
+Pulls the source or target images found in the image manifest.
+
+Pulling the `source` could be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
+
+Pulling the `target` could be useful if you need to load the images into another environment, such as [Kind](https://github.com/kubernetes-sigs/kind).
+
+```shell
+$ sinker pull <source|target>
+```
+
+### List command
+
+Prints a list of either the `source` or `target` images that exist in the image manifest. This can be useful for piping into additional tooling that acts on image urls.
+
+```shell
+$ sinker list <source|target>
+```
+
+#### --output flag (optional)
+
+Outputs the list to a file (e.g. `source-images.txt`).
+
+### Check command
+
+Checks if any of the source images found in the image manifest have new updates.
+
+```shell
+$ sinker check
+```
+
+#### --images flag (optional)
+
+A list of images to check updates for delimeted by commas, e.g.
+
+```shell
+$ sinker check --images jimmidyson/configmap-reload:v0.3.0,quay.io/coreos/prometheus-config-reloader:v0.39.0
+```
 
 ### Create command
 
@@ -123,18 +169,6 @@ sources:
   tag: v0.40.0
 ```
 
-### Push command
-
-Push all of the images inside of the image manifest to the target registry.
-
-```shell
-$ sinker push
-```
-
-#### --dryrun flag (optional)
-
-The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
-
 ### Update command
 
 Updates the current image manifest to reflect new changes found in the Kubernetes manifest(s).
@@ -144,35 +178,3 @@ $ sinker update <file|directory>
 ```
 
 _NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)._
-
-### Pull command
-
-Pulls the source or target images found in the image manifest.
-
-Pulling the `source` could be useful if you want to perform additional actions on the image(s) before performing a push operation (e.g. scanning for vulnerabilities).
-
-Pulling the `target` could be useful if you need to load the images into another environment, such as [Kind](https://github.com/kubernetes-sigs/kind).
-
-```shell
-$ sinker pull <source|target>
-```
-
-### List command
-
-Prints a list of either the `source` or `target` images that exist in the image manifest. This can be useful for piping into additional tooling that acts on image urls.
-
-```shell
-$ sinker list <source|target>
-```
-
-#### --output flag (optional)
-
-Outputs the list to a file (e.g. `source-images.txt`).
-
-### Check command
-
-Checks if any of the source images found in the image manifest have new updates. Currently only works for the source images that are hosted on Docker Hub.
-
-```shell
-$ sinker check
-```

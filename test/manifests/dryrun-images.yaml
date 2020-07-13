@@ -1,0 +1,8 @@
+# This test validates that the --dryrun flag identifies
+# that busybox:1.32.0 does not exist in the plexsystems repository
+
+target:
+  repository: plexsystems
+sources:
+- repository: busybox
+  tag: 1.32.0

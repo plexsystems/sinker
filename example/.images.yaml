@@ -1,7 +1,6 @@
-
 target:
   host: mycompany.com
-  repository: myteam
+  repository: myrepo
 sources:
 - repository: coreos/prometheus-operator
   host: quay.io
@@ -10,4 +9,4 @@ sources:
   tag: v0.3.0
 - repository: coreos/prometheus-config-reloader
   host: quay.io
-  tag: v0.40.0
+  tag: v0.39.0

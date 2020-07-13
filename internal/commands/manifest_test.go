@@ -26,34 +26,6 @@ func TestTarget_NoRepository_ReturnsRepository(t *testing.T) {
 	}
 }
 
-func TestPath_NoRepository_EmptyRepository(t *testing.T) {
-	const expected = "repo"
-	path := Path(expected)
-
-	if path.Host() != "" {
-		t.Errorf("expected path host to be blank, actual %s", path.Host())
-	}
-
-	if path.Repository() != expected {
-		t.Errorf("expected registry repository to be blank, actual %s", path.Repository())
-	}
-}
-
-func TestPath_WithRepository_ReturnsRepository(t *testing.T) {
-	const expectedHost = "url.com"
-	const expectedRepository = "foo/bar"
-
-	path := Path("url.com/foo/bar")
-
-	if path.Host() != expectedHost {
-		t.Errorf("expected path host %s, actual %s", expectedHost, path.Host())
-	}
-
-	if path.Repository() != expectedRepository {
-		t.Errorf("expected path repository to be %s actual %s", expectedRepository, path.Repository())
-	}
-}
-
 func TestSourceImage_WithoutRepository(t *testing.T) {
 	image := SourceImage{
 		Host: "source.com",

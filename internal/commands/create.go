@@ -23,8 +23,8 @@ func newCreateCommand() *cobra.Command {
 				path = args[0]
 			}
 
-			manifestDirectory := viper.GetString("manifest")
-			if err := runCreateCommand(path, manifestDirectory); err != nil {
+			manifestPath := viper.GetString("manifest")
+			if err := runCreateCommand(path, manifestPath); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
 
@@ -38,8 +38,8 @@ func newCreateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCreateCommand(path string, directory string) error {
-	if _, err := GetManifest(directory); err == nil {
+func runCreateCommand(path string, manifestPath string) error {
+	if _, err := GetManifest(manifestPath); err == nil {
 		return errors.New("manifest file already exists")
 	}
 
@@ -54,7 +54,7 @@ func runCreateCommand(path string, directory string) error {
 		}
 	}
 
-	if err := writeManifest(manifest, directory); err != nil {
+	if err := writeManifest(manifest, manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 
