@@ -1,0 +1,6 @@
+
+target:
+  repository: plexsystems
+sources:
+- repository: nginx
+  tag: latest

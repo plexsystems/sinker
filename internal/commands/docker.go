@@ -65,7 +65,7 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 		return fmt.Errorf("image pull: %w", err)
 	}
 
-	if err := c.waitForClientFinishedReading(ctx, reader, image, auth, "Pulling"); err != nil {
+	if err := c.waitForImagePulled(ctx, image); err != nil {
 		return fmt.Errorf("waiting for push: %w", err)
 	}
 
@@ -74,6 +74,48 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 	}
 
 	return nil
+}
+
+func (c Client) imageExistsOnHost(ctx context.Context, image string) (bool, error) {
+	imageList, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("image list: %w", err)
+	}
+
+	// When an image is sourced from docker hub, the image tag does
+	// not include docker.io (or library) on the local machine
+	image = strings.ReplaceAll(image, "docker.io/library/", "")
+	image = strings.ReplaceAll(image, "docker.io/", "")
+
+	for _, imageSummary := range imageList {
+		var searchList []string
+		if strings.Contains(image, "@") {
+			searchList = imageSummary.RepoDigests
+		} else {
+			searchList = imageSummary.RepoTags
+		}
+
+		for _, currentImage := range searchList {
+			if currentImage == image {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (c Client) waitForImagePulled(ctx context.Context, image string) error {
+	return wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+		c.Logger.Printf("Pulling %s ...", image)
+
+		exists, err := c.imageExistsOnHost(ctx, image)
+		if err != nil {
+			return false, fmt.Errorf("local image check: %w", err)
+		}
+
+		return exists, nil
+	})
 }
 
 // PushImageAndWait pushes an image and waits for it to finish pushing
@@ -85,15 +127,32 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 		return fmt.Errorf("pushing image: %w", err)
 	}
 
-	if err := c.waitForClientFinishedReading(ctx, reader, image, auth, "Pushing"); err != nil {
-		return fmt.Errorf("waiting for push: %w", err)
+	if err := waitForPushEvent(reader); err != nil {
+		return fmt.Errorf("wait for client: %w", err)
+	}
+
+	if err := c.waitForImagePushed(ctx, image, auth); err != nil {
+		return fmt.Errorf("wait for client: %w", err)
 	}
 
 	if err := reader.Close(); err != nil {
-		return fmt.Errorf("closing reader: %w", err)
+		return fmt.Errorf("close reader: %w", err)
 	}
 
 	return nil
+}
+
+func (c Client) waitForImagePushed(ctx context.Context, image string, auth string) error {
+	return wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+		c.Logger.Printf("Pushing %s ...", image)
+
+		exists, err := c.ImageExistsAtRemote(ctx, image, auth)
+		if err != nil {
+			return false, fmt.Errorf("image existance check: %w", err)
+		}
+
+		return exists, nil
+	})
 }
 
 // ListAllImages returns a list of all images and their tags found on the local machine
@@ -160,58 +219,50 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string, auth stri
 	return true, nil
 }
 
-func (c Client) waitForClientFinishedReading(ctx context.Context, reader io.ReadCloser, image string, auth string, message string) error {
-	return wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		finished, err := clientFinishedReading(reader)
-		if err != nil {
-			return false, fmt.Errorf("streaming: %w", err)
-		}
-
-		if finished {
-			return true, nil
-		}
-
-		c.Logger.Printf("%s %s ...", message, image)
-
-		return false, nil
-	})
-}
-
-func clientFinishedReading(reader io.ReadCloser) (bool, error) {
+func waitForPushEvent(reader io.ReadCloser) error {
 	type ErrorMessage struct {
 		Error string
 	}
 
-	type ProgressDetail struct {
-		Current int
-		Total   int
-	}
-
 	type StatusMessage struct {
-		Status         string
-		ProgressDetail ProgressDetail
+		Status string
 	}
 
 	var errorMessage ErrorMessage
 	var statusMessage StatusMessage
 
 	buffIOReader := bufio.NewReader(reader)
-	streamBytes, err := buffIOReader.ReadBytes('\n')
-	if err == io.EOF {
-		return true, nil
+
+	for {
+		streamBytes, err := buffIOReader.ReadBytes('\n')
+		if err == io.EOF {
+			return nil
+		}
+
+		if err := json.Unmarshal(streamBytes, &errorMessage); err != nil {
+			return fmt.Errorf("unmarshal error: %w", err)
+		}
+
+		if errorMessage.Error != "" {
+			return fmt.Errorf("returned error: %s", errorMessage.Error)
+		}
+
+		if err := json.Unmarshal(streamBytes, &statusMessage); err != nil {
+			return fmt.Errorf("unmarshal status: %w", err)
+		}
+
+		if statusMessage.Status == "Pushing" {
+			break
+		}
 	}
 
-	if err := json.Unmarshal(streamBytes, &errorMessage); err != nil {
-		return false, fmt.Errorf("unmarshal error: %w", err)
+	return nil
+}
+
+func imageHasLatestTag(image string) bool {
+	if !strings.Contains(image, ":") || strings.Contains(image, ":latest") {
+		return true
 	}
 
-	if errorMessage.Error != "" {
-		return false, fmt.Errorf("returned error: %s", errorMessage.Error)
-	}
-
-	if err := json.Unmarshal(streamBytes, &statusMessage); err != nil {
-		return false, fmt.Errorf("unmarshal status: %w", err)
-	}
-
-	return false, nil
+	return false
 }
