@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/plexsystems/sinker/internal/docker"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +37,7 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 }
 
 func runPushCommand(ctx context.Context, logger *log.Logger, directory string) error {
-	client, err := NewClient(logger)
+	client, err := docker.NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
