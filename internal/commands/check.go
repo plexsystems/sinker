@@ -3,12 +3,12 @@ package commands
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/docker/docker/api/types"
-	"github.com/genuinetools/reg/registry"
+	"github.com/plexsystems/sinker/internal/docker"
+
 	"github.com/hashicorp/go-version"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -19,8 +19,12 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 		Short: "Check for newer images in the source registry",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manifestDirectory := viper.GetString("manifest")
-			if err := runCheckCommand(ctx, logger, manifestDirectory); err != nil {
+			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
+				return fmt.Errorf("bind images flag: %w", err)
+			}
+
+			manifestPath := viper.GetString("manifest")
+			if err := runCheckCommand(ctx, logger, manifestPath); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -28,55 +32,61 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringSliceP("images", "i", []string{}, "The fully qualified images to check if newer versions exist (e.g. myhost.com/myrepo:v1.0.0)")
+
 	return &cmd
 }
 
-func runCheckCommand(ctx context.Context, logger *log.Logger, directory string) error {
-	dockerOpts := registry.Opt{
-		Insecure: true,
-		Domain:   "https://index.docker.io",
-	}
-
-	dockerRegistry, err := registry.New(ctx, types.AuthConfig{}, dockerOpts)
+func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath string) error {
+	client, err := docker.NewClient(logger)
 	if err != nil {
-		return fmt.Errorf("new registry: %w", err)
+		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := GetManifest(directory)
-	if err != nil {
-		return fmt.Errorf("get manifest: %w", err)
+	var imagesToCheck []string
+	if len(viper.GetStringSlice("images")) > 0 {
+		imagesToCheck = viper.GetStringSlice("images")
+	} else {
+		manifest, err := GetManifest(manifestPath)
+		if err != nil {
+			return fmt.Errorf("get manifest: %w", err)
+		}
+
+		for _, image := range manifest.Images {
+			imagesToCheck = append(imagesToCheck, image.String())
+		}
 	}
 
-	for _, image := range manifest.Images {
-		if image.Host != "docker.io" {
-			logger.Printf("Image %s not sourced from docker.io. Skipping ...", image.String())
+	images := getPathsFromImages(imagesToCheck)
+	for _, image := range images {
+		if image.Tag() == "" {
 			continue
 		}
 
-		imageVersion, err := version.NewVersion(image.Tag)
+		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			logger.Printf("Image %s version did not parse correctly. Skipping ...", image.String())
+			client.Logger.Printf("[CHECK] Image %s version did not parse correctly. Skipping ...", image)
 			continue
 		}
 
-		imageTags, err := dockerRegistry.Tags(ctx, image.Repository)
+		tags, err := client.GetTagsForRepo(ctx, image.Host(), image.Repository())
 		if err != nil {
-			return fmt.Errorf("fetch tags: %w", err)
+			return fmt.Errorf("get tags: %w", err)
 		}
 
-		imageTags = filterTags(imageTags)
+		tags = filterTags(tags)
 
-		newerVersions, err := getNewerVersions(imageVersion, imageTags)
+		newerVersions, err := getNewerVersions(imageVersion, tags)
 		if err != nil {
 			return fmt.Errorf("getting newer version: %w", err)
 		}
 
 		if len(newerVersions) == 0 {
-			logger.Printf("Image %v is up to date!", image.String())
+			client.Logger.Printf("[CHECK] Image %s is up to date!", image)
 			continue
 		}
 
-		logger.Printf("New versions for %v found: %v", image.String(), newerVersions)
+		client.Logger.Printf("[CHECK] New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil
@@ -105,10 +115,19 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 func filterTags(tags []string) []string {
 	var filteredTags []string
 	for _, tag := range tags {
-		if strings.Contains(tag, ".") && !strings.Contains(tag, "-") {
+		if strings.Count(tag, ".") > 1 && !strings.Contains(tag, "-") {
 			filteredTags = append(filteredTags, tag)
 		}
 	}
 
 	return filteredTags
+}
+
+func getPathsFromImages(images []string) []docker.RegistryPath {
+	var paths []docker.RegistryPath
+	for _, image := range images {
+		paths = append(paths, docker.RegistryPath(image))
+	}
+
+	return paths
 }

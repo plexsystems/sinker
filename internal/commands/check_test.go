@@ -11,12 +11,12 @@ func TestFilterTags(t *testing.T) {
 	tags := []string{
 		"noperiods",
 		"contains-hypen",
-		"1.0",
-		"v1.0",
+		"1.0.0",
+		"v1.0.0",
 	}
 
 	actual := filterTags(tags)
-	expected := []string{"1.0", "v1.0"}
+	expected := []string{"1.0.0", "v1.0.0"}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("unexpected filtering of tags. expected %v actual %v", expected, actual)

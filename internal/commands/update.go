@@ -14,9 +14,10 @@ func newUpdateCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manifestDirectory := viper.GetString("manifest")
+			sourcePath := args[0]
 
-			if err := runUpdateCommand(args[0], manifestDirectory); err != nil {
+			manifestPath := viper.GetString("manifest")
+			if err := runUpdateCommand(sourcePath, manifestPath); err != nil {
 				return fmt.Errorf("update: %w", err)
 			}
 
@@ -27,8 +28,8 @@ func newUpdateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runUpdateCommand(path string, directory string) error {
-	currentManifest, err := GetManifest(directory)
+func runUpdateCommand(path string, manifestPath string) error {
+	currentManifest, err := GetManifest(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
@@ -40,17 +41,19 @@ func runUpdateCommand(path string, directory string) error {
 
 	for i := range updatedManifest.Images {
 		for _, currentImage := range currentManifest.Images {
-			if currentImage.Repository == updatedManifest.Images[i].Repository && currentImage.Host == updatedManifest.Images[i].Host {
-				updatedManifest.Images[i].Auth = currentImage.Auth
+			if currentImage.Repository != updatedManifest.Images[i].Repository || currentImage.Host != updatedManifest.Images[i].Host {
+				continue
+			}
 
-				if currentManifest.Target.String() != "" {
-					updatedManifest.Target = currentImage.Target
-				}
+			updatedManifest.Images[i].Auth = currentImage.Auth
+
+			if currentManifest.Target.String() != "" {
+				updatedManifest.Target = currentImage.Target
 			}
 		}
 	}
 
-	if err := writeManifest(updatedManifest, directory); err != nil {
+	if err := writeManifest(updatedManifest, manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

@@ -1,0 +1,10 @@
+# This test validates that when using the latest tag the
+# image is always pushed and pulled
+
+target:
+  repository: plexsystems
+sources:
+- repository: busybox
+  host: docker.io
+  tag: latest
+  

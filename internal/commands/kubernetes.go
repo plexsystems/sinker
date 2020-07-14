@@ -9,8 +9,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/plexsystems/sinker/internal/docker"
+
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/docker/distribution/reference"
 	kubeyaml "github.com/ghodss/yaml"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,27 +20,12 @@ import (
 func marshalImages(images []string, target Target) ([]SourceImage, error) {
 	var containerImages []SourceImage
 	for _, image := range images {
-		imageReference, err := reference.ParseNormalizedNamed(image)
-		if err != nil {
-			return nil, fmt.Errorf("parse image: %w", err)
-		}
-		imageReference = reference.TagNameOnly(imageReference)
-
-		imageRepository := reference.Path(imageReference)
-		imageTag := strings.Split(imageReference.String(), ":")[1]
-
-		sourceHost := autoDetectSourceRegistry(imageRepository)
-
-		rawPath := sourceHost + "/" + imageRepository
-		rawPath = strings.ReplaceAll(rawPath, target.Repository+"/", "")
-		rawPath = strings.ReplaceAll(rawPath, "docker.io/", "")
-
-		path := Path(rawPath)
+		path := docker.RegistryPath(image)
 
 		sourceImage := SourceImage{
 			Host:       path.Host(),
 			Repository: path.Repository(),
-			Tag:        imageTag,
+			Tag:        path.Tag(),
 		}
 
 		containerImages = append(containerImages, sourceImage)
@@ -112,17 +98,6 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	return yamlFiles, nil
 }
 
-func dedupeImages(images []string) []string {
-	var dedupedImageList []string
-	for _, image := range images {
-		if !contains(dedupedImageList, image) {
-			dedupedImageList = append(dedupedImageList, image)
-		}
-	}
-
-	return dedupedImageList
-}
-
 func doSplit(data []byte) [][]byte {
 	linebreak := "\n"
 	windowsLineEnding := bytes.Contains(data, []byte("\r\n"))
@@ -152,52 +127,22 @@ func getFromKubernetesManifests(path string, target Target) ([]SourceImage, erro
 		}
 
 		if typeMeta.Kind == "Prometheus" {
-			var prometheus promv1.Prometheus
-			if err := kubeyaml.Unmarshal(yamlFile, &prometheus); err != nil {
-				return nil, fmt.Errorf("unmarshal prometheus: %w", err)
+			prometheusImages, err := getPrometheusImages(yamlFile)
+			if err != nil {
+				return nil, fmt.Errorf("get alertmanager images: %w", err)
 			}
 
-			var prometheusImage string
-			if prometheus.Spec.BaseImage != "" {
-				prometheusImage = prometheus.Spec.BaseImage + ":" + prometheus.Spec.Version
-			} else {
-				prometheusImage = *prometheus.Spec.Image
-			}
-
-			if len(prometheus.Spec.Containers) > 0 {
-				imageList = append(imageList, getImagesFromContainers(prometheus.Spec.Containers)...)
-			}
-
-			if len(prometheus.Spec.InitContainers) > 0 {
-				imageList = append(imageList, getImagesFromContainers(prometheus.Spec.InitContainers)...)
-			}
-
-			imageList = append(imageList, prometheusImage)
+			imageList = append(imageList, prometheusImages...)
 			continue
 		}
 
 		if typeMeta.Kind == "Alertmanager" {
-			var alertmanager promv1.Alertmanager
-			if err := kubeyaml.Unmarshal(yamlFile, &alertmanager); err != nil {
-				return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
+			alertmanagerImages, err := getAlertmanagerImages(yamlFile)
+			if err != nil {
+				return nil, fmt.Errorf("get alertmanager images: %w", err)
 			}
 
-			var alertmanagerImage string
-			if alertmanager.Spec.BaseImage != "" {
-				alertmanagerImage = alertmanager.Spec.BaseImage + ":" + alertmanager.Spec.Version
-			} else {
-				alertmanagerImage = *alertmanager.Spec.Image
-			}
-
-			if len(alertmanager.Spec.Containers) > 0 {
-				imageList = append(imageList, getImagesFromContainers(alertmanager.Spec.Containers)...)
-			}
-
-			if len(alertmanager.Spec.InitContainers) > 0 {
-				imageList = append(imageList, getImagesFromContainers(alertmanager.Spec.InitContainers)...)
-			}
-
-			imageList = append(imageList, alertmanagerImage)
+			imageList = append(imageList, alertmanagerImages...)
 			continue
 		}
 
@@ -218,13 +163,73 @@ func getFromKubernetesManifests(path string, target Target) ([]SourceImage, erro
 		imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
 	}
 
-	dedupedImageList := dedupeImages(imageList)
+	var dedupedImageList []string
+	for _, image := range imageList {
+		if !contains(dedupedImageList, image) {
+			dedupedImageList = append(dedupedImageList, image)
+		}
+	}
+
 	marshalledImages, err := marshalImages(dedupedImageList, target)
 	if err != nil {
 		return nil, fmt.Errorf("marshal images: %w", err)
 	}
 
 	return marshalledImages, nil
+}
+
+func getPrometheusImages(yamlFile []byte) ([]string, error) {
+	var images []string
+	var prometheus promv1.Prometheus
+	if err := kubeyaml.Unmarshal(yamlFile, &prometheus); err != nil {
+		return nil, fmt.Errorf("unmarshal prometheus: %w", err)
+	}
+
+	var prometheusImage string
+	if prometheus.Spec.BaseImage != "" {
+		prometheusImage = prometheus.Spec.BaseImage + ":" + prometheus.Spec.Version
+	} else {
+		prometheusImage = *prometheus.Spec.Image
+	}
+
+	if len(prometheus.Spec.Containers) > 0 {
+		images = append(images, getImagesFromContainers(prometheus.Spec.Containers)...)
+	}
+
+	if len(prometheus.Spec.InitContainers) > 0 {
+		images = append(images, getImagesFromContainers(prometheus.Spec.InitContainers)...)
+	}
+
+	images = append(images, prometheusImage)
+
+	return images, nil
+}
+
+func getAlertmanagerImages(yamlFile []byte) ([]string, error) {
+	var images []string
+	var alertmanager promv1.Alertmanager
+	if err := kubeyaml.Unmarshal(yamlFile, &alertmanager); err != nil {
+		return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
+	}
+
+	var alertmanagerImage string
+	if alertmanager.Spec.BaseImage != "" {
+		alertmanagerImage = alertmanager.Spec.BaseImage + ":" + alertmanager.Spec.Version
+	} else {
+		alertmanagerImage = *alertmanager.Spec.Image
+	}
+
+	if len(alertmanager.Spec.Containers) > 0 {
+		images = append(images, getImagesFromContainers(alertmanager.Spec.Containers)...)
+	}
+
+	if len(alertmanager.Spec.InitContainers) > 0 {
+		images = append(images, getImagesFromContainers(alertmanager.Spec.InitContainers)...)
+	}
+
+	images = append(images, alertmanagerImage)
+
+	return images, nil
 }
 
 func getImagesFromContainers(containers []corev1.Container) []string {
@@ -243,4 +248,14 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 	}
 
 	return images
+}
+
+func contains(images []string, image string) bool {
+	for _, currentImage := range images {
+		if strings.EqualFold(currentImage, image) {
+			return true
+		}
+	}
+
+	return false
 }

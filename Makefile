@@ -1,3 +1,11 @@
+.PHONY: build
+build:
+	go build
+
+.PHONY: test
+test:
+	go test -v ./...
+
 .PHONY: release
 release:
 	GOOS=darwin GOARCH=amd64 go build -o sinker-darwin-amd64
