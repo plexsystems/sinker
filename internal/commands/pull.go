@@ -77,7 +77,7 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, ma
 		}
 
 		if !exists {
-			client.Logger.Printf("[PULL] Image %s is missing from the host and will be pulled.", pullImage)
+			client.Logger.Printf("[PULL] Image %s is missing and will be pulled.", pullImage)
 			imagesToPull[pullImage] = auth
 		}
 	}
