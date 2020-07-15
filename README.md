@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/plexsystems/sinker)](https://goreportcard.com/report/github.com/plexsystems/sinker)
 [![GitHub release](https://img.shields.io/github/release/plexsystems/sinker.svg)](https://github.com/plexsystems/sinker/releases)
 
-![logo](logo.png)
+![logo](assets/logo.png)
 
 `sinker` syncs container images from one registry to another. This is useful in cases when you rely on images that exist in a public container registry, but need to pull from a private registry.
 
@@ -71,6 +71,10 @@ All auth is handled by looking at the clients Docker auth. If the client can per
 In the event that an image that needs to be sync'd is in another registry, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This is useful in CI pipelines.
 
 ## Usage
+
+Descriptions of commands and flags to help understand how to use Sinker.
+
+![demo](assets/sinker-demo.gif)
 
 ### Global flags
 
