@@ -80,7 +80,7 @@ Descriptions of commands and flags to help understand how to use Sinker.
 
 #### --manifest
 
-Set the directory of the manifest file. Defaults to the working directory.
+Set the directory or location of the manifest file to read from. Defaults to `.images.yaml` in the working directory.
 
 ### Push command
 
