@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
@@ -14,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
+func newCheckCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the source registry",
@@ -25,7 +26,7 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runCheckCommand(ctx, logger, manifestPath); err != nil {
+			if err := runCheckCommand(logger, manifestPath); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -38,7 +39,10 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath string) error {
+func runCheckCommand(logger *log.Logger, manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	client, err := docker.NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)

@@ -25,12 +25,10 @@ type Manifest struct {
 }
 
 // New returns a new image manifest
-func New(target string) Manifest {
-	targetPath := docker.RegistryPath(target)
-
+func New(host string, repository string) Manifest {
 	manifestTarget := Target{
-		Host:       targetPath.Host(),
-		Repository: targetPath.Repository(),
+		Host:       host,
+		Repository: repository,
 	}
 
 	manifest := Manifest{
@@ -41,10 +39,15 @@ func New(target string) Manifest {
 }
 
 // NewWithAutodetect returns a new image manifest with images found in the repository
-func NewWithAutodetect(target string, path string) (Manifest, error) {
-	manifest := New(target)
+func NewWithAutodetect(host string, repository string, path string) (Manifest, error) {
+	manifest := New(host, repository)
 
-	foundImages, err := getImagesFromKubernetesManifests(path, manifest.Target)
+	target := Target{
+		Host:       host,
+		Repository: repository,
+	}
+
+	foundImages, err := getImagesFromKubernetesManifests(path, target)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
 	}

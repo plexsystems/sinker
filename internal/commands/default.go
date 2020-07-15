@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"log"
 	"os"
 	"path"
@@ -23,8 +22,6 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.PersistentFlags().StringP("manifest", "m", "", "Path where the manifest file is (defaults to .images.yaml in the current directory)")
 	viper.BindPFlag("manifest", cmd.PersistentFlags().Lookup("manifest"))
 
-	ctx := context.Background()
-
 	logrusLogger := logrus.New()
 	logrusLogger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: false,
@@ -35,9 +32,9 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.AddCommand(newCreateCommand())
 	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newListCommand())
-	cmd.AddCommand(newPullCommand(ctx, logrusLogger))
-	cmd.AddCommand(newPushCommand(ctx, logrusLogger))
-	cmd.AddCommand(newCheckCommand(ctx, logrusLogger))
+	cmd.AddCommand(newPullCommand(logrusLogger))
+	cmd.AddCommand(newPushCommand(logrusLogger))
+	cmd.AddCommand(newCheckCommand(logrusLogger))
 
 	return &cmd
 }

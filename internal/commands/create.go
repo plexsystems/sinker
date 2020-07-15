@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
 
 	"github.com/spf13/cobra"
@@ -45,12 +46,14 @@ func runCreateCommand(path string, manifestPath string) error {
 		return errors.New("manifest file already exists")
 	}
 
+	targetPath := docker.RegistryPath(viper.GetString("target"))
+
 	var err error
 	var imageManifest manifest.Manifest
 	if path == "" {
-		imageManifest = manifest.New(viper.GetString("target"))
+		imageManifest = manifest.New(targetPath.Host(), targetPath.Repository())
 	} else {
-		imageManifest, err = manifest.NewWithAutodetect(viper.GetString("target"), path)
+		imageManifest, err = manifest.NewWithAutodetect(targetPath.Host(), targetPath.Repository(), path)
 		if err != nil {
 			return fmt.Errorf("new manifest with autodetect: %w", err)
 		}

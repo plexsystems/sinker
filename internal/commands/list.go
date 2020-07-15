@@ -13,7 +13,7 @@ import (
 func newListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "list <source|target>",
-		Short:     "List the images found in the image manifest",
+		Short:     "List the images found in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 

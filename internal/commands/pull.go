@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
@@ -13,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
+func newPullCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
 		Short:     "Pull the source or target images found in the image manifest",
@@ -27,7 +28,7 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(ctx, logger, location, manifestPath); err != nil {
+			if err := runPullCommand(logger, location, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -38,7 +39,10 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(ctx context.Context, logger *log.Logger, location string, manifestPath string) error {
+func runPullCommand(logger *log.Logger, location string, manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
 	client, err := docker.NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)

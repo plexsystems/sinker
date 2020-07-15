@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
@@ -13,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
+func newPushCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "push",
 		Short: "Push images in the manifest to the target repository",
@@ -24,7 +25,7 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPushCommand(ctx, logger, manifestPath); err != nil {
+			if err := runPushCommand(logger, manifestPath); err != nil {
 				return fmt.Errorf("push: %w", err)
 			}
 
@@ -37,7 +38,10 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPushCommand(ctx context.Context, logger *log.Logger, manifestPath string) error {
+func runPushCommand(logger *log.Logger, manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
 	client, err := docker.NewClient(logger)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
@@ -52,7 +56,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, manifestPath string
 		return errors.New("no sources found in the image manifest")
 	}
 
-	logger.Printf("[INFO] Finding images that do not exist at target registry ...")
+	logger.Printf("[INFO] Finding images that need to be pushed ...")
 
 	var sourcesToPush []manifest.Source
 	for _, source := range imageManifest.Sources {
@@ -67,7 +71,7 @@ func runPushCommand(ctx context.Context, logger *log.Logger, manifestPath string
 	}
 
 	if len(sourcesToPush) == 0 {
-		logger.Println("[INFO] All sources exist at the remote registry!.")
+		logger.Println("[INFO] All images are up to date!")
 		return nil
 	}
 

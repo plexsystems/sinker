@@ -2,30 +2,6 @@ package manifest
 
 import "testing"
 
-func TestTarget_NoRepository_EmptyRepository(t *testing.T) {
-	const expected = "target.com"
-
-	target := Target{
-		Host: expected,
-	}
-
-	if target.String() != expected {
-		t.Errorf("expected target to be %s, actual %s", expected, target.String())
-	}
-}
-
-func TestTarget_NoRepository_ReturnsRepository(t *testing.T) {
-	const expected = "target.com/repo"
-	target := Target{
-		Host:       "target.com",
-		Repository: "repo",
-	}
-
-	if target.String() != expected {
-		t.Errorf("expected target to be %s, actual %s", expected, target.String())
-	}
-}
-
 func TestSource_WithoutRepository(t *testing.T) {
 	source := Source{
 		Host: "source.com",

@@ -36,7 +36,7 @@ func runUpdateCommand(path string, manifestPath string) error {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	updatedManifest, err := manifest.NewWithAutodetect(currentManifest.Target.String(), path)
+	updatedManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
@@ -49,7 +49,7 @@ func runUpdateCommand(path string, manifestPath string) error {
 
 			updatedManifest.Sources[i].Auth = currentImage.Auth
 
-			if currentManifest.Target.String() != "" {
+			if currentManifest.Target.Host != "" || currentManifest.Target.Repository != "" {
 				updatedManifest.Target = currentImage.Target
 			}
 		}
