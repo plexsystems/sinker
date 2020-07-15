@@ -25,9 +25,6 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 				location = args[0]
 			}
 
-			ctx, cancel := context.WithTimeout(ctx, CommandTimeout)
-			defer cancel()
-
 			manifestPath := viper.GetString("manifest")
 			if err := runPullCommand(ctx, logger, location, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
@@ -83,10 +80,6 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, ma
 	}
 
 	for image, auth := range imagesToPull {
-		if err != nil {
-			return fmt.Errorf("getting %s auth: %w", location, err)
-		}
-
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
 			return fmt.Errorf("pull image: %w", err)
 		}

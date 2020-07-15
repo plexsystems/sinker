@@ -126,7 +126,7 @@ func NewManifest(target string) Manifest {
 func NewAutodetectManifest(target string, path string) (Manifest, error) {
 	manifest := NewManifest(target)
 
-	foundImages, err := getFromKubernetesManifests(path, manifest.Target)
+	foundImages, err := getImagesFromKubernetesManifests(path, manifest.Target)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
 	}

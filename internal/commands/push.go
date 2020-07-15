@@ -22,9 +22,6 @@ func newPushCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(ctx, CommandTimeout)
-			defer cancel()
-
 			manifestPath := viper.GetString("manifest")
 			if err := runPushCommand(ctx, logger, manifestPath); err != nil {
 				return fmt.Errorf("push: %w", err)

@@ -5,23 +5,19 @@ import (
 	"log"
 	"os"
 	"path"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// CommandTimeout is how long to wait before timing out on a command
-const CommandTimeout = 10 * time.Minute
-
 // NewDefaultCommand creates a new default command
 func NewDefaultCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
-		Long:    "A CLI tool to sync container images to another registry",
-		Version: "0.9.0",
+		Long:    "A tool to sync container images to another container registry",
+		Version: "0.10.0",
 	}
 
 	cmd.PersistentFlags().StringP("manifest", "m", "", "Path where the manifest file is (defaults to .images.yaml in the current directory)")

@@ -1,18 +1,14 @@
 package commands
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/docker/cli/cli/config"
-	"github.com/docker/cli/cli/config/credentials"
+	"github.com/plexsystems/sinker/internal/docker"
 )
 
 func getEncodedSourceAuth(source SourceImage) (string, error) {
 	if source.Auth.Password != "" {
-		auth, err := getEncodedAuth(source.Auth)
+		auth, err := docker.GetEncodedBasicAuth(source.Auth.Username, source.Auth.Password)
 		if err != nil {
 			return "", fmt.Errorf("get encoded auth: %w", err)
 		}
@@ -20,7 +16,8 @@ func getEncodedSourceAuth(source SourceImage) (string, error) {
 		return auth, nil
 	}
 
-	auth, err := getEncodedAuthForHost(source.Host)
+	authHost := getAuthHostFromRegistryHost(source.Host)
+	auth, err := docker.GetEncodedAuthForHost(authHost)
 	if err != nil {
 		return "", fmt.Errorf("get encoded auth for host: %w", err)
 	}
@@ -30,7 +27,7 @@ func getEncodedSourceAuth(source SourceImage) (string, error) {
 
 func getEncodedTargetAuth(target Target) (string, error) {
 	if target.Auth.Password != "" {
-		auth, err := getEncodedAuth(target.Auth)
+		auth, err := docker.GetEncodedBasicAuth(target.Auth.Username, target.Auth.Password)
 		if err != nil {
 			return "", fmt.Errorf("get encoded auth: %w", err)
 		}
@@ -38,7 +35,8 @@ func getEncodedTargetAuth(target Target) (string, error) {
 		return auth, nil
 	}
 
-	auth, err := getEncodedAuthForHost(target.Host)
+	authHost := getAuthHostFromRegistryHost(target.Host)
+	auth, err := docker.GetEncodedAuthForHost(authHost)
 	if err != nil {
 		return "", fmt.Errorf("get encoded auth for host: %w", err)
 	}
@@ -46,47 +44,10 @@ func getEncodedTargetAuth(target Target) (string, error) {
 	return auth, nil
 }
 
-func getEncodedAuth(auth Auth) (string, error) {
-	username := os.Getenv(auth.Username)
-	password := os.Getenv(auth.Password)
-
-	authConfig := Auth{
-		Username: username,
-		Password: password,
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
-
-}
-
-func getEncodedAuthForHost(host string) (string, error) {
+func getAuthHostFromRegistryHost(host string) string {
 	if host == "" || host == "docker.io" {
-		host = "https://index.docker.io/v1/"
+		return "https://index.docker.io/v1/"
 	}
 
-	cfg, err := config.Load(config.Dir())
-	if err != nil {
-		return "", fmt.Errorf("loading docker config: %w", err)
-	}
-
-	if !cfg.ContainsAuth() {
-		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
-	}
-
-	authConfig, err := cfg.GetAuthConfig(host)
-	if err != nil {
-		return "", fmt.Errorf("getting auth config: %w", err)
-	}
-
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
+	return host
 }

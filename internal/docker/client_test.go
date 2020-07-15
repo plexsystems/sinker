@@ -1,8 +1,6 @@
 package docker
 
-import (
-	"testing"
-)
+import "testing"
 
 type RegistryPathTest struct {
 	actualPath         RegistryPath
@@ -67,6 +65,34 @@ func TestRegistryPath_Host_WithSlash(t *testing.T) {
 		expectedHost:       "host.com",
 		expectedRepository: "",
 		expectedTag:        "",
+		expectedDigest:     "",
+	}
+
+	verifyRegistryPathMethods(t, test)
+}
+
+func TestRegistryPath_Repository_NoHost(t *testing.T) {
+	path := RegistryPath("repo:v1.0.0")
+
+	test := RegistryPathTest{
+		actualPath:         path,
+		expectedHost:       "",
+		expectedRepository: "repo",
+		expectedTag:        "v1.0.0",
+		expectedDigest:     "",
+	}
+
+	verifyRegistryPathMethods(t, test)
+}
+
+func TestRegistryPath_Repository_RepeatedName(t *testing.T) {
+	path := RegistryPath("repo/repository:v1.0.0")
+
+	test := RegistryPathTest{
+		actualPath:         path,
+		expectedHost:       "",
+		expectedRepository: "repo/repository",
+		expectedTag:        "v1.0.0",
 		expectedDigest:     "",
 	}
 
