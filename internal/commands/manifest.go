@@ -13,10 +13,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Manifest is a collection of images to sync
-type Manifest struct {
-	Target Target        `yaml:"target"`
-	Images []SourceImage `yaml:"sources,omitempty"`
+// Auth is a username and password to log into a registry
+type Auth struct {
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 // Target is a target location for an image
@@ -100,10 +100,10 @@ func (c SourceImage) TargetImage() string {
 	return target
 }
 
-// Auth is a username and password to log into a registry
-type Auth struct {
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
+// Manifest is a collection of images to sync
+type Manifest struct {
+	Target Target        `yaml:"target"`
+	Images []SourceImage `yaml:"sources,omitempty"`
 }
 
 // NewManifest returns a new image manifest
@@ -126,7 +126,7 @@ func NewManifest(target string) Manifest {
 func NewAutodetectManifest(target string, path string) (Manifest, error) {
 	manifest := NewManifest(target)
 
-	foundImages, err := getFromKubernetesManifests(path, manifest.Target)
+	foundImages, err := getImagesFromKubernetesManifests(path, manifest.Target)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
 	}
@@ -144,15 +144,6 @@ func GetManifest(path string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
 	}
 
-	manifest, err := marshalManifest(manifestContents)
-	if err != nil {
-		return Manifest{}, fmt.Errorf("marshal manifest: %w", err)
-	}
-
-	return manifest, nil
-}
-
-func marshalManifest(manifestContents []byte) (Manifest, error) {
 	var manifest Manifest
 	if err := yaml.Unmarshal(manifestContents, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
@@ -167,7 +158,7 @@ func marshalManifest(manifestContents []byte) (Manifest, error) {
 	return manifest, nil
 }
 
-func writeManifest(manifest Manifest, path string) error {
+func WriteManifest(manifest Manifest, path string) error {
 	imageManifestContents, err := yaml.Marshal(&manifest)
 	if err != nil {
 		return fmt.Errorf("marshal image manifest: %w", err)

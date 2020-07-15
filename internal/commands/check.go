@@ -57,7 +57,11 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 		}
 	}
 
-	images := getPathsFromImages(imagesToCheck)
+	var images []docker.RegistryPath
+	for _, image := range imagesToCheck {
+		images = append(images, docker.RegistryPath(image))
+	}
+
 	for _, image := range images {
 		if image.Tag() == "" {
 			continue
@@ -65,7 +69,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			client.Logger.Printf("[CHECK] Image %s version did not parse correctly. Skipping ...", image)
+			client.Logger.Printf("[CHECK] Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
@@ -105,6 +109,8 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 		}
 	}
 
+	// For images that are very out of date, the list can be quite long
+	// Only return the latest 5 releases to keep the list manageable
 	if len(newerVersions) > 5 {
 		newerVersions = newerVersions[len(newerVersions)-5:]
 	}
@@ -112,22 +118,38 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 	return newerVersions, nil
 }
 
+// filterTags filters out tags that would not be desirable to update to
 func filterTags(tags []string) []string {
 	var filteredTags []string
 	for _, tag := range tags {
-		if strings.Count(tag, ".") > 1 && !strings.Contains(tag, "-") {
-			filteredTags = append(filteredTags, tag)
+		semverTag, err := version.NewSemver(tag)
+		if err != nil {
+			continue
 		}
+
+		if !strings.EqualFold(semverTag.String(), tag) && !strings.EqualFold("v"+semverTag.String(), tag) {
+			continue
+		}
+
+		// This will remove tags that include architectures and other strings
+		// not necessarily related to a release
+		allowedPreReleases := []string{"alpha", "beta", "rc"}
+		if strings.Contains(tag, "-") && !containsSubstring(allowedPreReleases, tag) {
+			continue
+		}
+
+		filteredTags = append(filteredTags, tag)
 	}
 
 	return filteredTags
 }
 
-func getPathsFromImages(images []string) []docker.RegistryPath {
-	var paths []docker.RegistryPath
-	for _, image := range images {
-		paths = append(paths, docker.RegistryPath(image))
+func containsSubstring(items []string, item string) bool {
+	for _, currentItem := range items {
+		if strings.Contains(item, currentItem) {
+			return true
+		}
 	}
 
-	return paths
+	return false
 }

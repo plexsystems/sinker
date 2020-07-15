@@ -17,39 +17,40 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func marshalImages(images []string, target Target) ([]SourceImage, error) {
-	var containerImages []SourceImage
-	for _, image := range images {
-		path := docker.RegistryPath(image)
+func getImagesFromKubernetesManifests(path string, target Target) ([]SourceImage, error) {
+	files, err := getYamlFiles(path)
+	if err != nil {
+		return nil, fmt.Errorf("get yaml files: %w", err)
+	}
 
-		sourceImage := SourceImage{
-			Host:       path.Host(),
-			Repository: path.Repository(),
-			Tag:        path.Tag(),
+	yamlFiles, err := splitYamlFiles(files)
+	if err != nil {
+		return nil, fmt.Errorf("split yaml files: %w", err)
+	}
+
+	var imageList []string
+	for _, yamlFile := range yamlFiles {
+		images, err := getImagesFromYamlFile(yamlFile)
+		if err != nil {
+			return nil, fmt.Errorf("get images from yaml: %w", err)
 		}
 
-		containerImages = append(containerImages, sourceImage)
+		imageList = append(imageList, images...)
 	}
 
-	return containerImages, nil
-}
-
-func autoDetectSourceRegistry(repository string) string {
-	repositoryMappings := map[string]string{
-		"kubernetes-ingress-controller": "quay.io",
-		"coreos":                        "quay.io",
-		"open-policy-agent":             "quay.io",
-		"twistlock":                     "registry.twistlock.com",
-	}
-
-	sourceRegistry := "docker.io"
-	for repositorySegment, registry := range repositoryMappings {
-		if strings.Contains(repository, repositorySegment) {
-			sourceRegistry = registry
+	var dedupedImageList []string
+	for _, image := range imageList {
+		if !contains(dedupedImageList, image) {
+			dedupedImageList = append(dedupedImageList, image)
 		}
 	}
 
-	return sourceRegistry
+	marshalledImages, err := marshalImages(dedupedImageList, target)
+	if err != nil {
+		return nil, fmt.Errorf("marshal images: %w", err)
+	}
+
+	return marshalledImages, nil
 }
 
 func getYamlFiles(path string) ([]string, error) {
@@ -90,7 +91,14 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 			return nil, fmt.Errorf("open file: %w", err)
 		}
 
-		individualYamlFiles := doSplit(fileContent)
+		var lineBreak string
+		if bytes.Contains(fileContent, []byte("\r\n")) && runtime.GOOS == "windows" {
+			lineBreak = "\r\n"
+		} else {
+			lineBreak = "\n"
+		}
+
+		individualYamlFiles := bytes.Split(fileContent, []byte(lineBreak+"---"+lineBreak))
 
 		yamlFiles = append(yamlFiles, individualYamlFiles...)
 	}
@@ -98,84 +106,95 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	return yamlFiles, nil
 }
 
-func doSplit(data []byte) [][]byte {
-	linebreak := "\n"
-	windowsLineEnding := bytes.Contains(data, []byte("\r\n"))
-	if windowsLineEnding && runtime.GOOS == "windows" {
-		linebreak = "\r\n"
+func marshalImages(images []string, target Target) ([]SourceImage, error) {
+	var containerImages []SourceImage
+	for _, image := range images {
+		path := docker.RegistryPath(image)
+
+		sourceHost := getSourceHostFromRepository(path.Repository())
+
+		sourceRepository := path.Repository()
+		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
+		sourceRepository = strings.TrimLeft(sourceRepository, "/")
+
+		sourceImage := SourceImage{
+			Host:       sourceHost,
+			Repository: sourceRepository,
+			Tag:        path.Tag(),
+		}
+
+		containerImages = append(containerImages, sourceImage)
 	}
 
-	return bytes.Split(data, []byte(linebreak+"---"+linebreak))
+	return containerImages, nil
 }
 
-func getFromKubernetesManifests(path string, target Target) ([]SourceImage, error) {
-	files, err := getYamlFiles(path)
-	if err != nil {
-		return nil, fmt.Errorf("get yaml files: %w", err)
+func getSourceHostFromRepository(repository string) string {
+	repositoryMappings := map[string]string{
+		"kubernetes-ingress-controller": "quay.io",
+		"coreos":                        "quay.io",
+		"open-policy-agent":             "quay.io",
+		"twistlock":                     "registry.twistlock.com",
 	}
 
-	yamlFiles, err := splitYamlFiles(files)
-	if err != nil {
-		return nil, fmt.Errorf("split yaml files: %w", err)
-	}
-
-	var imageList []string
-	for _, yamlFile := range yamlFiles {
-		var typeMeta metav1.TypeMeta
-		if err := kubeyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
-			continue
-		}
-
-		if typeMeta.Kind == "Prometheus" {
-			prometheusImages, err := getPrometheusImages(yamlFile)
-			if err != nil {
-				return nil, fmt.Errorf("get alertmanager images: %w", err)
-			}
-
-			imageList = append(imageList, prometheusImages...)
-			continue
-		}
-
-		if typeMeta.Kind == "Alertmanager" {
-			alertmanagerImages, err := getAlertmanagerImages(yamlFile)
-			if err != nil {
-				return nil, fmt.Errorf("get alertmanager images: %w", err)
-			}
-
-			imageList = append(imageList, alertmanagerImages...)
-			continue
-		}
-
-		type BaseSpec struct {
-			Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
-		}
-
-		type BaseType struct {
-			Spec BaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-		}
-
-		var contents BaseType
-		if err := kubeyaml.Unmarshal(yamlFile, &contents); err != nil {
-			continue
-		}
-
-		imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.InitContainers)...)
-		imageList = append(imageList, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
-	}
-
-	var dedupedImageList []string
-	for _, image := range imageList {
-		if !contains(dedupedImageList, image) {
-			dedupedImageList = append(dedupedImageList, image)
+	for repositorySegment, host := range repositoryMappings {
+		if strings.Contains(repository, repositorySegment) {
+			return host
 		}
 	}
 
-	marshalledImages, err := marshalImages(dedupedImageList, target)
-	if err != nil {
-		return nil, fmt.Errorf("marshal images: %w", err)
+	return ""
+}
+
+func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
+	var images []string
+	var typeMeta metav1.TypeMeta
+
+	// If the yaml does not contain a TypeMeta, it will not be a valid
+	// Kubernetes resource and can be assumed to have no images
+	if err := kubeyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
+		return []string{}, nil
 	}
 
-	return marshalledImages, nil
+	if typeMeta.Kind == "Prometheus" {
+		prometheusImages, err := getPrometheusImages(yamlFile)
+		if err != nil {
+			return nil, fmt.Errorf("get prometheus images: %w", err)
+		}
+
+		images = append(images, prometheusImages...)
+
+		return images, nil
+	}
+
+	if typeMeta.Kind == "Alertmanager" {
+		alertmanagerImages, err := getAlertmanagerImages(yamlFile)
+		if err != nil {
+			return nil, fmt.Errorf("get alertmanager images: %w", err)
+		}
+
+		images = append(images, alertmanagerImages...)
+
+		return images, nil
+	}
+
+	type BaseSpec struct {
+		Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
+	}
+
+	type BaseType struct {
+		Spec BaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	}
+
+	var contents BaseType
+	if err := kubeyaml.Unmarshal(yamlFile, &contents); err != nil {
+		return []string{}, nil
+	}
+
+	images = append(images, getImagesFromContainers(contents.Spec.Template.Spec.InitContainers)...)
+	images = append(images, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
+
+	return images, nil
 }
 
 func getPrometheusImages(yamlFile []byte) ([]string, error) {

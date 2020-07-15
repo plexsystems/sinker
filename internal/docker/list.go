@@ -21,7 +21,6 @@ func (c Client) ImageExistsOnHost(ctx context.Context, image string) (bool, erro
 
 	var images []string
 	var err error
-
 	if strings.Contains(image, "@") {
 		images, err = c.GetAllDigestsOnHost(ctx)
 	} else {
@@ -100,9 +99,7 @@ func (c Client) GetAllImagesOnHost(ctx context.Context) ([]string, error) {
 // GetAllDigestsOnHost gets all of the images and their digests on the host
 func (c Client) GetAllDigestsOnHost(ctx context.Context) ([]string, error) {
 	var digests []string
-	imageSummaries, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{
-		All: true,
-	})
+	imageSummaries, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("list images: %w", err)
 	}
@@ -116,9 +113,16 @@ func (c Client) GetAllDigestsOnHost(ctx context.Context) ([]string, error) {
 
 // GetTagsForRepo returns all of the tags for a given repository
 func (c Client) GetTagsForRepo(ctx context.Context, host string, repository string) ([]string, error) {
-	repositoryReference, err := getRepositoryFromImage(host, repository)
+	var imageRepository string
+	if host != "" {
+		imageRepository = host + "/" + repository
+	} else {
+		imageRepository = "index.docker.io/" + repository
+	}
+
+	repositoryReference, err := name.NewRepository(imageRepository)
 	if err != nil {
-		return nil, fmt.Errorf("get repository reference: %w", err)
+		return nil, fmt.Errorf("new repo: %w", err)
 	}
 
 	tags, err := remote.List(repositoryReference, remote.WithAuthFromKeychain(authn.DefaultKeychain))
@@ -127,22 +131,6 @@ func (c Client) GetTagsForRepo(ctx context.Context, host string, repository stri
 	}
 
 	return tags, nil
-}
-
-func getRepositoryFromImage(host string, repository string) (name.Repository, error) {
-	var imageRepository string
-	if host != "" {
-		imageRepository = host + "/" + repository
-	} else {
-		imageRepository = "index.docker.io/" + repository
-	}
-
-	newRepository, err := name.NewRepository(imageRepository)
-	if err != nil {
-		return name.Repository{}, fmt.Errorf("new repo: %w", err)
-	}
-
-	return newRepository, nil
 }
 
 func hasLatestTag(image string) bool {

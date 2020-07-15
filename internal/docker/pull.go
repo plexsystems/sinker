@@ -14,18 +14,18 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 	retryError := retry.Do(
 		func() error {
 			if err := c.tryPullImageAndWait(ctx, image, auth); err != nil {
-				return err
+				return fmt.Errorf("try pull image: %w", err)
 			}
 
 			return nil
 		},
 		retry.OnRetry(func(retryAttempt uint, err error) {
-			c.Logger.Printf("[RETRY] Unable to pull %s (Retrying #%v)", image, retryAttempt+1)
+			c.Logger.Printf("[RETRY] Unable to pull %v (Retrying #%v)", image, retryAttempt+1)
 		}),
 	)
 
 	if retryError != nil {
-		return fmt.Errorf("%w", retryError)
+		return retryError
 	}
 
 	return nil

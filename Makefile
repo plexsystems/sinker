@@ -4,7 +4,12 @@ build:
 
 .PHONY: test
 test:
-	go test -v ./...
+	go test -v ./... -count=1
+
+.PHONY: acceptance
+acceptance:
+	go build
+	bats acceptance.bats
 
 .PHONY: release
 release:

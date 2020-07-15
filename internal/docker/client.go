@@ -63,8 +63,14 @@ func (r RegistryPath) Tag() string {
 
 // Host is the host in the registry path
 func (r RegistryPath) Host() string {
-	if !strings.Contains(string(r), "/") {
-		return string(r)
+	host := string(r)
+
+	if r.Tag() != "" {
+		host = strings.ReplaceAll(host, ":"+r.Tag(), "")
+	}
+
+	if !strings.Contains(host, ".") {
+		return ""
 	}
 
 	hostTokens := strings.Split(string(r), "/")
@@ -74,10 +80,6 @@ func (r RegistryPath) Host() string {
 
 // Repository is the repository in the registry path
 func (r RegistryPath) Repository() string {
-	if !strings.Contains(string(r), "/") {
-		return ""
-	}
-
 	repository := string(r)
 
 	if r.Tag() != "" {
@@ -89,15 +91,18 @@ func (r RegistryPath) Repository() string {
 	}
 
 	if r.Host() != "" {
-		repository = strings.ReplaceAll(repository, r.Host()+"/", "")
+		repository = strings.ReplaceAll(repository, r.Host(), "")
 	}
+
+	repository = strings.TrimLeft(repository, "/")
 
 	return repository
 }
 
-// ErrorMessage is an error message from the Docker client
-type ErrorMessage struct {
-	Error string `json:"error"`
+// ProgressDetail is the current state of pushing or pulling an image (in Bytes)
+type ProgressDetail struct {
+	Current int `json:"current"`
+	Total   int `json:"total"`
 }
 
 // Status is the status output from the Docker client
@@ -107,41 +112,25 @@ type Status struct {
 	ProgressDetail ProgressDetail `json:"progressDetail"`
 }
 
-// ProgressDetail is the current state of pushing or pulling an image (in Bytes)
-type ProgressDetail struct {
-	Current int
-	Total   int
-}
-
 // GetMessage returns a human friendly message from parsing the status message
 func (s Status) GetMessage() string {
-	const defaultStatusMessage = "Processing"
-
-	if strings.Contains(s.Message, "Pulling from") || strings.Contains(s.Message, "The push refers to repository") {
+	if strings.Contains(s.Message, "Pulling from") || strings.Contains(s.Message, "The push refers to") {
 		return "Started"
-	}
-
-	if strings.Contains(s.Message, "Pulling fs") || strings.Contains(s.Message, "Layer already exists") {
-		return fmt.Sprintf("Processing layer (trace ID %v)", s.ID)
 	}
 
 	if s.ProgressDetail.Total > 0 {
 		return fmt.Sprintf("Processing %vB of %vB", s.ProgressDetail.Current, s.ProgressDetail.Total)
 	}
 
-	if strings.Contains(s.Message, "Preparing") {
-		return "Preparing"
-	}
-
-	if strings.Contains(s.Message, "Verifying") {
-		return "Verifying Checksum"
-	}
-
-	return defaultStatusMessage
+	return "Processing"
 }
 
 func waitForScannerComplete(logger *log.Logger, clientScanner *bufio.Scanner, image string, command string) error {
-	var errorMessage ErrorMessage
+	type clientErrorMessage struct {
+		Error string `json:"error"`
+	}
+
+	var errorMessage clientErrorMessage
 	var status Status
 
 	var scans int
@@ -158,7 +147,8 @@ func waitForScannerComplete(logger *log.Logger, clientScanner *bufio.Scanner, im
 			return fmt.Errorf("returned error: %s", errorMessage.Error)
 		}
 
-		if scans%50 == 0 {
+		// Serves as makeshift polling to occasionally print the status of the Docker command.
+		if scans%25 == 0 {
 			logger.Printf("[%s] %s (%s)", command, image, status.GetMessage())
 		}
 

@@ -11,7 +11,7 @@ import (
 func newCreateCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "create <source>",
-		Short: "Create a new image manifest in the current directory",
+		Short: "Create a new image manifest",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
@@ -54,7 +54,7 @@ func runCreateCommand(path string, manifestPath string) error {
 		}
 	}
 
-	if err := writeManifest(manifest, manifestPath); err != nil {
+	if err := WriteManifest(manifest, manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

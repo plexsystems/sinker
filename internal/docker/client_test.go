@@ -1,10 +1,8 @@
 package docker
 
-import (
-	"testing"
-)
+import "testing"
 
-type RegistryPathTest struct {
+type registryPathTest struct {
 	actualPath         RegistryPath
 	expectedHost       string
 	expectedRepository string
@@ -12,7 +10,7 @@ type RegistryPathTest struct {
 	expectedDigest     string
 }
 
-func verifyRegistryPathMethods(t *testing.T, test RegistryPathTest) {
+func verifyRegistryPathMethods(t *testing.T, test registryPathTest) {
 	if test.actualPath.Host() != test.expectedHost {
 		t.Errorf("expected host to be %s, actual %s", test.expectedHost, test.actualPath.Host())
 	}
@@ -34,7 +32,7 @@ func TestPath_Empty(t *testing.T) {
 	const expected = ""
 	path := RegistryPath(expected)
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "",
 		expectedRepository: "",
@@ -48,7 +46,7 @@ func TestPath_Empty(t *testing.T) {
 func TestRegistryPath_Host(t *testing.T) {
 	path := RegistryPath("host.com")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "",
@@ -62,7 +60,7 @@ func TestRegistryPath_Host(t *testing.T) {
 func TestRegistryPath_Host_WithSlash(t *testing.T) {
 	path := RegistryPath("host.com/")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "",
@@ -73,10 +71,38 @@ func TestRegistryPath_Host_WithSlash(t *testing.T) {
 	verifyRegistryPathMethods(t, test)
 }
 
+func TestRegistryPath_Repository_NoHost(t *testing.T) {
+	path := RegistryPath("repo:v1.0.0")
+
+	test := registryPathTest{
+		actualPath:         path,
+		expectedHost:       "",
+		expectedRepository: "repo",
+		expectedTag:        "v1.0.0",
+		expectedDigest:     "",
+	}
+
+	verifyRegistryPathMethods(t, test)
+}
+
+func TestRegistryPath_Repository_RepeatedName(t *testing.T) {
+	path := RegistryPath("repo/repository:v1.0.0")
+
+	test := registryPathTest{
+		actualPath:         path,
+		expectedHost:       "",
+		expectedRepository: "repo/repository",
+		expectedTag:        "v1.0.0",
+		expectedDigest:     "",
+	}
+
+	verifyRegistryPathMethods(t, test)
+}
+
 func TestRegistryPath_Repository_OneLevel(t *testing.T) {
 	path := RegistryPath("host.com/repo")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "repo",
@@ -90,7 +116,7 @@ func TestRegistryPath_Repository_OneLevel(t *testing.T) {
 func TestRegistryPath_Repository_MultipleLevels(t *testing.T) {
 	path := RegistryPath("host.com/repo/more")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "repo/more",
@@ -104,7 +130,7 @@ func TestRegistryPath_Repository_MultipleLevels(t *testing.T) {
 func TestRegistryPath_Tag(t *testing.T) {
 	path := RegistryPath("host.com/repo:v1.0.0")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "repo",
@@ -118,7 +144,7 @@ func TestRegistryPath_Tag(t *testing.T) {
 func TestRegistryPath_Tag_None(t *testing.T) {
 	path := RegistryPath("host.com/repo")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "repo",
@@ -132,7 +158,7 @@ func TestRegistryPath_Tag_None(t *testing.T) {
 func TestRegistryPath_Digest(t *testing.T) {
 	path := RegistryPath("host.com/repo@sha256:abc123")
 
-	test := RegistryPathTest{
+	test := registryPathTest{
 		actualPath:         path,
 		expectedHost:       "host.com",
 		expectedRepository: "repo",

@@ -53,7 +53,7 @@ func runUpdateCommand(path string, manifestPath string) error {
 		}
 	}
 
-	if err := writeManifest(updatedManifest, manifestPath); err != nil {
+	if err := WriteManifest(updatedManifest, manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 
