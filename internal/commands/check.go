@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/plexsystems/sinker/internal/docker"
+	"github.com/plexsystems/sinker/internal/manifest"
 
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
@@ -47,13 +48,13 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 	if len(viper.GetStringSlice("images")) > 0 {
 		imagesToCheck = viper.GetStringSlice("images")
 	} else {
-		manifest, err := GetManifest(manifestPath)
+		manifest, err := manifest.Get(manifestPath)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}
 
-		for _, image := range manifest.Images {
-			imagesToCheck = append(imagesToCheck, image.String())
+		for _, source := range manifest.Sources {
+			imagesToCheck = append(imagesToCheck, source.Image())
 		}
 	}
 

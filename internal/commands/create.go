@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/plexsystems/sinker/internal/manifest"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,22 +41,22 @@ func newCreateCommand() *cobra.Command {
 }
 
 func runCreateCommand(path string, manifestPath string) error {
-	if _, err := GetManifest(manifestPath); err == nil {
+	if _, err := manifest.Get(manifestPath); err == nil {
 		return errors.New("manifest file already exists")
 	}
 
 	var err error
-	var manifest Manifest
+	var imageManifest manifest.Manifest
 	if path == "" {
-		manifest = NewManifest(viper.GetString("target"))
+		imageManifest = manifest.New(viper.GetString("target"))
 	} else {
-		manifest, err = NewAutodetectManifest(viper.GetString("target"), path)
+		imageManifest, err = manifest.NewWithAutodetect(viper.GetString("target"), path)
 		if err != nil {
 			return fmt.Errorf("new manifest with autodetect: %w", err)
 		}
 	}
 
-	if err := WriteManifest(manifest, manifestPath); err != nil {
+	if err := imageManifest.Write(manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

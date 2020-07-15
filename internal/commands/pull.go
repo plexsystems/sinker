@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/plexsystems/sinker/internal/docker"
+	"github.com/plexsystems/sinker/internal/manifest"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -43,26 +44,26 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, ma
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := GetManifest(manifestPath)
+	manifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	if len(manifest.Images) == 0 {
-		return errors.New("no images found in the image manifest")
+	if len(manifest.Sources) == 0 {
+		return errors.New("no sources found in the image manifest")
 	}
 
 	imagesToPull := make(map[string]string)
-	for _, image := range manifest.Images {
+	for _, source := range manifest.Sources {
 		var pullImage string
 		var auth string
 		var err error
 		if location == "target" {
-			pullImage = image.TargetImage()
-			auth, err = getEncodedTargetAuth(image.Target)
+			pullImage = source.TargetImage()
+			auth, err = source.Target.EncodedAuth()
 		} else {
-			pullImage = image.String()
-			auth, err = getEncodedSourceAuth(image)
+			pullImage = source.Image()
+			auth, err = source.EncodedAuth()
 		}
 		if err != nil {
 			return fmt.Errorf("get %s auth: %w", location, err)

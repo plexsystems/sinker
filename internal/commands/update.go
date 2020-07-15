@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 
+	"github.com/plexsystems/sinker/internal/manifest"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -29,23 +31,23 @@ func newUpdateCommand() *cobra.Command {
 }
 
 func runUpdateCommand(path string, manifestPath string) error {
-	currentManifest, err := GetManifest(manifestPath)
+	currentManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	updatedManifest, err := NewAutodetectManifest(currentManifest.Target.String(), path)
+	updatedManifest, err := manifest.NewWithAutodetect(currentManifest.Target.String(), path)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	for i := range updatedManifest.Images {
-		for _, currentImage := range currentManifest.Images {
-			if currentImage.Repository != updatedManifest.Images[i].Repository || currentImage.Host != updatedManifest.Images[i].Host {
+	for i := range updatedManifest.Sources {
+		for _, currentImage := range currentManifest.Sources {
+			if currentImage.Repository != updatedManifest.Sources[i].Repository || currentImage.Host != updatedManifest.Sources[i].Host {
 				continue
 			}
 
-			updatedManifest.Images[i].Auth = currentImage.Auth
+			updatedManifest.Sources[i].Auth = currentImage.Auth
 
 			if currentManifest.Target.String() != "" {
 				updatedManifest.Target = currentImage.Target
@@ -53,7 +55,7 @@ func runUpdateCommand(path string, manifestPath string) error {
 		}
 	}
 
-	if err := WriteManifest(updatedManifest, manifestPath); err != nil {
+	if err := updatedManifest.Write(manifestPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/plexsystems/sinker/internal/docker"
+	"github.com/plexsystems/sinker/internal/manifest"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -42,65 +43,65 @@ func runPushCommand(ctx context.Context, logger *log.Logger, manifestPath string
 		return fmt.Errorf("new docker client: %w", err)
 	}
 
-	manifest, err := GetManifest(manifestPath)
+	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	if len(manifest.Images) == 0 {
-		return errors.New("no images found in the image manifest")
+	if len(imageManifest.Sources) == 0 {
+		return errors.New("no sources found in the image manifest")
 	}
 
 	logger.Printf("[INFO] Finding images that do not exist at target registry ...")
 
-	var pushImages []SourceImage
-	for _, image := range manifest.Images {
-		exists, err := client.ImageExistsAtRemote(ctx, image.TargetImage())
+	var sourcesToPush []manifest.Source
+	for _, source := range imageManifest.Sources {
+		exists, err := client.ImageExistsAtRemote(ctx, source.TargetImage())
 		if err != nil {
 			return fmt.Errorf("image exists at remote: %w", err)
 		}
 
 		if !exists {
-			pushImages = append(pushImages, image)
+			sourcesToPush = append(sourcesToPush, source)
 		}
 	}
 
-	if len(pushImages) == 0 {
-		logger.Println("[INFO] All images are up to date! 0 images pushed.")
+	if len(sourcesToPush) == 0 {
+		logger.Println("[INFO] All sources exist at the remote registry!.")
 		return nil
 	}
 
 	if viper.GetBool("dryrun") {
-		for _, image := range pushImages {
-			logger.Printf("[INFO] Image %s would be pushed as %s", image.String(), image.TargetImage())
+		for _, source := range sourcesToPush {
+			logger.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}
 
-	for _, image := range pushImages {
-		auth, err := getEncodedSourceAuth(image)
-		if err != nil {
-			return fmt.Errorf("get host auth: %w", err)
-		}
-
-		if err := client.PullImageAndWait(ctx, image.String(), auth); err != nil {
-			return fmt.Errorf("pull image and wait: %w", err)
-		}
-	}
-
-	for _, image := range pushImages {
-		if err := client.DockerClient.ImageTag(ctx, image.String(), image.TargetImage()); err != nil {
-			return fmt.Errorf("tagging image: %w", err)
-		}
-	}
-
-	for _, image := range pushImages {
-		auth, err := getEncodedTargetAuth(image.Target)
+	for _, source := range sourcesToPush {
+		auth, err := source.EncodedAuth()
 		if err != nil {
 			return fmt.Errorf("get source auth: %w", err)
 		}
 
-		if err := client.PushImageAndWait(ctx, image.TargetImage(), auth); err != nil {
+		if err := client.PullImageAndWait(ctx, source.Image(), auth); err != nil {
+			return fmt.Errorf("pull image and wait: %w", err)
+		}
+	}
+
+	for _, source := range sourcesToPush {
+		if err := client.DockerClient.ImageTag(ctx, source.Image(), source.TargetImage()); err != nil {
+			return fmt.Errorf("tagging image: %w", err)
+		}
+	}
+
+	for _, source := range sourcesToPush {
+		auth, err := source.Target.EncodedAuth()
+		if err != nil {
+			return fmt.Errorf("get target auth: %w", err)
+		}
+
+		if err := client.PushImageAndWait(ctx, source.TargetImage(), auth); err != nil {
 			return fmt.Errorf("pushing image to target: %w", err)
 		}
 	}
