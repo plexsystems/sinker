@@ -1,8 +1,6 @@
 package commands
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestGetAuthHostFromRegistryHost(t *testing.T) {
 	testCases := []struct {
