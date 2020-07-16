@@ -16,17 +16,21 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	log "github.com/sirupsen/logrus"
 )
+
+// Logger defines the required methods for loggers
+type Logger interface {
+	Printf(format string, args ...interface{})
+}
 
 // Client is a Docker client with a logger
 type Client struct {
 	DockerClient *client.Client
-	Logger       *log.Logger
+	Logger       Logger
 }
 
-// NewClient returns a new Docker client
-func NewClient(logger *log.Logger) (Client, error) {
+// NewClientWithLogger returns a new Docker client with logging
+func NewClientWithLogger(logger Logger) (Client, error) {
 	retry.DefaultDelay = 5 * time.Second
 	retry.DefaultAttempts = 3
 
@@ -192,57 +196,45 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 	return true, nil
 }
 
-// ProgressDetail is the current state of pushing or pulling an image (in Bytes)
-type ProgressDetail struct {
+type progressDetail struct {
 	Current int `json:"current"`
 	Total   int `json:"total"`
 }
 
-// Status is the status output from the Docker client
-type Status struct {
-	Message        string         `json:"status"`
+type statusLine struct {
 	ID             string         `json:"id"`
-	ProgressDetail ProgressDetail `json:"progressDetail"`
+	Message        string         `json:"status"`
+	ProgressDetail progressDetail `json:"progressDetail"`
+	ErrorMessage   string         `json:"error"`
 }
 
-// GetMessage returns a human friendly message from parsing the status message
-func (s Status) GetMessage() string {
-	if strings.Contains(s.Message, "Pulling from") || strings.Contains(s.Message, "The push refers to") {
+func getStatusMessage(status statusLine) string {
+	if strings.Contains(status.Message, "Pulling from") || strings.Contains(status.Message, "The push refers to") {
 		return "Started"
 	}
 
-	if s.ProgressDetail.Total > 0 {
-		return fmt.Sprintf("Processing %vB of %vB", s.ProgressDetail.Current, s.ProgressDetail.Total)
+	if status.ProgressDetail.Total > 0 {
+		return fmt.Sprintf("Processing %vB of %vB", status.ProgressDetail.Current, status.ProgressDetail.Total)
 	}
 
 	return "Processing"
 }
 
-func waitForScannerComplete(logger *log.Logger, clientScanner *bufio.Scanner, image string, command string) error {
-	type clientErrorMessage struct {
-		Error string `json:"error"`
-	}
-
-	var errorMessage clientErrorMessage
-	var status Status
-
+func waitForScannerComplete(logger Logger, clientScanner *bufio.Scanner, image string, command string) error {
+	var status statusLine
 	var scans int
 	for clientScanner.Scan() {
 		if err := json.Unmarshal(clientScanner.Bytes(), &status); err != nil {
 			return fmt.Errorf("unmarshal status: %w", err)
 		}
 
-		if err := json.Unmarshal(clientScanner.Bytes(), &errorMessage); err != nil {
-			return fmt.Errorf("unmarshal error: %w", err)
-		}
-
-		if errorMessage.Error != "" {
-			return fmt.Errorf("returned error: %s", errorMessage.Error)
+		if status.ErrorMessage != "" {
+			return fmt.Errorf("returned error: %s", status.ErrorMessage)
 		}
 
 		// Serves as makeshift polling to occasionally print the status of the Docker command.
 		if scans%25 == 0 {
-			logger.Printf("[%s] %s (%s)", command, image, status.GetMessage())
+			logger.Printf("[%s] %s (%s)", command, image, getStatusMessage(status))
 		}
 
 		scans++
@@ -253,28 +245,6 @@ func waitForScannerComplete(logger *log.Logger, clientScanner *bufio.Scanner, im
 	}
 
 	logger.Printf("[%s] %s complete.", command, image)
-
-	return nil
-}
-
-func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth string) error {
-	opts := types.ImagePushOptions{
-		RegistryAuth: auth,
-	}
-
-	reader, err := c.DockerClient.ImagePush(ctx, image, opts)
-	if err != nil {
-		return fmt.Errorf("push image: %w", err)
-	}
-	clientScanner := bufio.NewScanner(reader)
-
-	if err := waitForScannerComplete(c.Logger, clientScanner, image, "PUSH"); err != nil {
-		return fmt.Errorf("wait for scanner: %w", err)
-	}
-
-	if err := reader.Close(); err != nil {
-		return fmt.Errorf("close reader: %w", err)
-	}
 
 	return nil
 }
@@ -291,6 +261,28 @@ func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth stri
 	clientScanner := bufio.NewScanner(reader)
 
 	if err := waitForScannerComplete(c.Logger, clientScanner, image, "PULL"); err != nil {
+		return fmt.Errorf("wait for scanner: %w", err)
+	}
+
+	if err := reader.Close(); err != nil {
+		return fmt.Errorf("close reader: %w", err)
+	}
+
+	return nil
+}
+
+func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth string) error {
+	opts := types.ImagePushOptions{
+		RegistryAuth: auth,
+	}
+
+	reader, err := c.DockerClient.ImagePush(ctx, image, opts)
+	if err != nil {
+		return fmt.Errorf("push image: %w", err)
+	}
+	clientScanner := bufio.NewScanner(reader)
+
+	if err := waitForScannerComplete(c.Logger, clientScanner, image, "PUSH"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
 

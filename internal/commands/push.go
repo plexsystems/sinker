@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -42,7 +41,7 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClient(logger)
+	client, err := docker.NewClientWithLogger(logger)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
@@ -50,10 +49,6 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
-	}
-
-	if len(imageManifest.Sources) == 0 {
-		return errors.New("no sources found in the image manifest")
 	}
 
 	logger.Printf("[INFO] Finding images that need to be pushed ...")

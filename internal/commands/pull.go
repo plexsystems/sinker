@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -43,7 +42,7 @@ func runPullCommand(logger *log.Logger, location string, manifestPath string) er
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClient(logger)
+	client, err := docker.NewClientWithLogger(logger)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -51,10 +50,6 @@ func runPullCommand(logger *log.Logger, location string, manifestPath string) er
 	manifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
-	}
-
-	if len(manifest.Sources) == 0 {
-		return errors.New("no sources found in the image manifest")
 	}
 
 	imagesToPull := make(map[string]string)

@@ -4,10 +4,17 @@ import (
 	"os"
 
 	"github.com/plexsystems/sinker/internal/commands"
+
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	if err := commands.NewDefaultCommand().Execute(); err != nil {
+	logrusLogger := logrus.New()
+	logrusLogger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: false,
+	})
+
+	if err := commands.NewDefaultCommand(logrusLogger).Execute(); err != nil {
 		os.Exit(1)
 	}
 }
