@@ -17,8 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// GetImagesFromKubernetesManifests returns all images found in kubernetes manifests
-// that are located at the given path
+// GetImagesFromKubernetesManifests returns all images found in Kubernetes manifests
+// that are located at the specified path.
 func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
@@ -151,7 +151,7 @@ func getSourceHostFromRepository(repository string) string {
 func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 
 	// If the yaml does not contain a TypeMeta, it will not be a valid
-	// Kubernetes resource and can be assumed to have no images
+	// Kubernetes resource and can be assumed to have no images.
 	var typeMeta metav1.TypeMeta
 	if err := kubeyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
 		return []string{}, nil

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NewDefaultCommand creates a new default command
+// NewDefaultCommand creates the default command.
 func NewDefaultCommand(logger *log.Logger) *cobra.Command {
 	cmd := cobra.Command{
 		Use:     path.Base(os.Args[0]),

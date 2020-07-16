@@ -18,21 +18,21 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
-// Logger defines the required methods for loggers
-type Logger interface {
-	Printf(format string, args ...interface{})
-}
-
-// Client is a Docker client with a logger
+// A Client manages the communication with the Docker client.
 type Client struct {
+
+	// Docker client to be used for executing commands.
 	DockerClient *client.Client
-	Logger       Logger
+
+	// LogInfo is the function to be called when the Client
+	// needs to log information about a command that is currently running.
+	LogInfo func(format string, args ...interface{})
 }
 
-// NewClientWithLogger returns a new Docker client with logging
-func NewClientWithLogger(logger Logger) (Client, error) {
-	retry.DefaultDelay = 5 * time.Second
-	retry.DefaultAttempts = 3
+// NewLoggerClient returns a Docker client configured with the given information logger.
+func NewLoggerClient(logInfo func(format string, args ...interface{})) (Client, error) {
+	retry.DefaultDelay = 10 * time.Second
+	retry.DefaultAttempts = 2
 
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -41,13 +41,14 @@ func NewClientWithLogger(logger Logger) (Client, error) {
 
 	client := Client{
 		DockerClient: dockerClient,
-		Logger:       logger,
+		LogInfo:      logInfo,
 	}
 
 	return client, nil
 }
 
-// PushImageAndWait pushes an image and waits for it to finish pushing
+// PushImageAndWait pushes an image and waits for it to finish pushing.
+// If an error occurs when pulling an image, the pull will be attempted again before failing.
 func (c Client) PushImageAndWait(ctx context.Context, image string, auth string) error {
 	retryError := retry.Do(
 		func() error {
@@ -58,7 +59,7 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 			return nil
 		},
 		retry.OnRetry(func(retryAttempt uint, err error) {
-			c.Logger.Printf("[RETRY] Unable to push %v (Retrying #%v)", image, retryAttempt+1)
+			c.LogInfo("[RETRY] Unable to push %v (Retrying #%v)", image, retryAttempt+1)
 		}),
 	)
 
@@ -69,7 +70,8 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 	return nil
 }
 
-// PullImageAndWait pulls an image and waits for it to finish pulling
+// PullImageAndWait pushes an image and waits for it to finish pushing.
+// If an error occurs when pulling an image, the pull will be attempted again before failing.
 func (c Client) PullImageAndWait(ctx context.Context, image string, auth string) error {
 	retryError := retry.Do(
 		func() error {
@@ -80,7 +82,7 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 			return nil
 		},
 		retry.OnRetry(func(retryAttempt uint, err error) {
-			c.Logger.Printf("[RETRY] Unable to pull %v (Retrying #%v)", image, retryAttempt+1)
+			c.LogInfo("[RETRY] Unable to pull %v (Retrying #%v)", image, retryAttempt+1)
 		}),
 	)
 
@@ -91,7 +93,7 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 	return nil
 }
 
-// ImageExistsOnHost returns true if the image exists on the host machine
+// ImageExistsOnHost returns true if the image exists on the host machine.
 func (c Client) ImageExistsOnHost(ctx context.Context, image string) (bool, error) {
 	if hasLatestTag(image) {
 		return false, nil
@@ -115,7 +117,7 @@ func (c Client) ImageExistsOnHost(ctx context.Context, image string) (bool, erro
 	return false, nil
 }
 
-// GetAllImagesOnHost gets all of the images and their tags on the host
+// GetAllImagesOnHost gets all of the images and their tags on the host.
 func (c Client) GetAllImagesOnHost(ctx context.Context) ([]string, error) {
 	var images []string
 	imageSummaries, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{})
@@ -130,7 +132,7 @@ func (c Client) GetAllImagesOnHost(ctx context.Context) ([]string, error) {
 	return images, nil
 }
 
-// GetAllDigestsOnHost gets all of the images and their digests on the host
+// GetAllDigestsOnHost gets all of the images and their digests on the host.
 func (c Client) GetAllDigestsOnHost(ctx context.Context) ([]string, error) {
 	var digests []string
 	imageSummaries, err := c.DockerClient.ImageList(ctx, types.ImageListOptions{})
@@ -145,7 +147,7 @@ func (c Client) GetAllDigestsOnHost(ctx context.Context) ([]string, error) {
 	return digests, nil
 }
 
-// GetTagsForRepo returns all of the tags for a given repository
+// GetTagsForRepo returns all of the tags for a given repository.
 func (c Client) GetTagsForRepo(ctx context.Context, host string, repository string) ([]string, error) {
 	var imageRepository string
 	if host != "" {
@@ -167,7 +169,7 @@ func (c Client) GetTagsForRepo(ctx context.Context, host string, repository stri
 	return tags, nil
 }
 
-// ImageExistsAtRemote returns true if the image exists at the remote registry
+// ImageExistsAtRemote returns true if the image exists at the remote registry.
 func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, error) {
 	if hasLatestTag(image) {
 		return false, nil
@@ -218,7 +220,7 @@ func getStatusMessage(status statusLine) string {
 	return "Processing"
 }
 
-func waitForScannerComplete(logger Logger, clientScanner *bufio.Scanner, image string, command string) error {
+func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image string, command string) error {
 	var status statusLine
 	var scans int
 	for clientScanner.Scan() {
@@ -232,7 +234,7 @@ func waitForScannerComplete(logger Logger, clientScanner *bufio.Scanner, image s
 
 		// Serves as makeshift polling to occasionally print the status of the Docker command.
 		if scans%25 == 0 {
-			logger.Printf("[%s] %s (%s)", command, image, getStatusMessage(status))
+			c.LogInfo("[%s] %s (%s)", command, image, getStatusMessage(status))
 		}
 
 		scans++
@@ -242,7 +244,7 @@ func waitForScannerComplete(logger Logger, clientScanner *bufio.Scanner, image s
 		return fmt.Errorf("scanner: %w", clientScanner.Err())
 	}
 
-	logger.Printf("[%s] %s complete.", command, image)
+	c.LogInfo("[%s] %s complete.", command, image)
 
 	return nil
 }
@@ -258,7 +260,7 @@ func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth stri
 	}
 	clientScanner := bufio.NewScanner(reader)
 
-	if err := waitForScannerComplete(c.Logger, clientScanner, image, "PULL"); err != nil {
+	if err := c.waitForScannerComplete(clientScanner, image, "PULL"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
 
@@ -280,7 +282,7 @@ func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth stri
 	}
 	clientScanner := bufio.NewScanner(reader)
 
-	if err := waitForScannerComplete(c.Logger, clientScanner, image, "PUSH"); err != nil {
+	if err := c.waitForScannerComplete(clientScanner, image, "PUSH"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
 
@@ -294,7 +296,7 @@ func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth stri
 func imageExists(image string, images []string) bool {
 
 	// When an image is sourced from docker hub, the image tag does
-	// not include docker.io (or library) on the local machine
+	// not include docker.io (or library) on the local machine.
 	image = strings.ReplaceAll(image, "docker.io/library/", "")
 	image = strings.ReplaceAll(image, "docker.io/", "")
 

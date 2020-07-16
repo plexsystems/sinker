@@ -13,13 +13,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Manifest is a collection of images to sync
+// A Manifest contains all of the sources to push to a target registry.
 type Manifest struct {
 	Target  Target   `yaml:"target"`
 	Sources []Source `yaml:"sources,omitempty"`
 }
 
-// New returns a new image manifest
+// New returns an empty Manifest with the target set to the
+// specified host and repository.
 func New(host string, repository string) Manifest {
 	manifestTarget := Target{
 		Host:       host,
@@ -33,7 +34,8 @@ func New(host string, repository string) Manifest {
 	return manifest
 }
 
-// NewWithAutodetect returns a new image manifest with images found in the repository
+// NewWithAutodetect returns a Manifest populated with the images found in the specified path.
+// The target of the Manifest will be set to the specified host and repository.
 func NewWithAutodetect(host string, repository string, path string) (Manifest, error) {
 	manifest := New(host, repository)
 
@@ -52,7 +54,8 @@ func NewWithAutodetect(host string, repository string, path string) (Manifest, e
 	return manifest, nil
 }
 
-// Get returns the manifest at the specified path
+// Get returns the Manifest found at the specified path.
+// An error is returned when a Manifest cannot be found.
 func Get(path string) (Manifest, error) {
 	manifestLocation := getManifestLocation(path)
 	manifestContents, err := ioutil.ReadFile(manifestLocation)
@@ -74,7 +77,7 @@ func Get(path string) (Manifest, error) {
 	return manifest, nil
 }
 
-// Write writes the contents of the manifest file to the specified path
+// Write writes the contents of the manifest file to the specified path.
 func (m Manifest) Write(path string) error {
 	imageManifestContents, err := yaml.Marshal(&m)
 	if err != nil {
@@ -90,35 +93,21 @@ func (m Manifest) Write(path string) error {
 	return nil
 }
 
-// Auth is a username and password to log into a registry
+// Auth is a username and password to authenticate to a registry.
 type Auth struct {
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
 }
 
-// Target is a target location for an image
+// Target is the target registry where the images defined in
+// the manifest will be pushed to.
 type Target struct {
 	Host       string `yaml:"host,omitempty"`
 	Repository string `yaml:"repository,omitempty"`
 	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
-func (t Target) String() string {
-	var target string
-	if t.Repository != "" {
-		target = "/" + t.Repository + target
-	}
-
-	if t.Host != "" {
-		target = "/" + t.Host + target
-	}
-
-	target = strings.TrimLeft(target, "/")
-
-	return target
-}
-
-// EncodedAuth returns the Base64 encoded auth for the target registry
+// EncodedAuth returns the Base64 encoded auth for the target registry.
 func (t Target) EncodedAuth() (string, error) {
 	if t.Auth.Password != "" {
 		auth, err := docker.GetEncodedBasicAuth(t.Auth.Username, t.Auth.Password)
@@ -138,7 +127,7 @@ func (t Target) EncodedAuth() (string, error) {
 	return auth, nil
 }
 
-// Source is a container image in the manifest
+// Source is a container image in the manifest.
 type Source struct {
 	Repository string `yaml:"repository"`
 	Host       string `yaml:"host,omitempty"`
@@ -148,7 +137,7 @@ type Source struct {
 	Auth       Auth   `yaml:"auth,omitempty"`
 }
 
-// Image returns the source image including its tag
+// Image returns the source image including its tag or digest.
 func (s Source) Image() string {
 	var source string
 	if s.Tag != "" {
@@ -170,7 +159,7 @@ func (s Source) Image() string {
 	return source
 }
 
-// TargetImage returns the target image includes its tag
+// TargetImage returns the target image including its tag or digest.
 func (s Source) TargetImage() string {
 	var target string
 	if s.Tag != "" {
@@ -197,7 +186,7 @@ func (s Source) TargetImage() string {
 	return target
 }
 
-// EncodedAuth returns the Base64 encoded auth for the source registry
+// EncodedAuth returns the Base64 encoded auth for the source registry.
 func (s Source) EncodedAuth() (string, error) {
 	if s.Auth.Password != "" {
 		auth, err := docker.GetEncodedBasicAuth(s.Auth.Username, s.Auth.Password)

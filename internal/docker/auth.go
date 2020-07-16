@@ -10,7 +10,7 @@ import (
 	"github.com/docker/cli/cli/config/types"
 )
 
-// GetEncodedBasicAuth encodes a username and password into Base64
+// GetEncodedBasicAuth encodes a username and password into Base64.
 func GetEncodedBasicAuth(username string, password string) (string, error) {
 	authConfig := types.AuthConfig{
 		Username: username,
@@ -26,8 +26,7 @@ func GetEncodedBasicAuth(username string, password string) (string, error) {
 
 }
 
-// GetEncodedAuthForHost returns a Base64 encoded auth
-// for the host defined in the Docker configuration
+// GetEncodedAuthForHost returns a Base64 encoded auth for the given host.
 func GetEncodedAuthForHost(host string) (string, error) {
 	cfg, err := config.Load(config.Dir())
 	if err != nil {

@@ -2,10 +2,10 @@ package docker
 
 import "strings"
 
-// RegistryPath is a registry path for a docker image
+// RegistryPath is a registry path for a container image.
 type RegistryPath string
 
-// Digest is the digest in the registry path, if one exists
+// Digest returns the digest in the registry path.
 func (r RegistryPath) Digest() string {
 	if !strings.Contains(string(r), "@") {
 		return ""
@@ -16,7 +16,7 @@ func (r RegistryPath) Digest() string {
 	return digestTokens[1]
 }
 
-// Tag is the tag in the registry path, if one exists
+// Tag returns the tag in the registry path.
 func (r RegistryPath) Tag() string {
 	if strings.Contains(string(r), "@") || !strings.Contains(string(r), ":") {
 		return ""
@@ -27,7 +27,7 @@ func (r RegistryPath) Tag() string {
 	return tagTokens[1]
 }
 
-// Host is the host in the registry path
+// Host returns the host in the registry path.
 func (r RegistryPath) Host() string {
 	host := string(r)
 
@@ -44,7 +44,7 @@ func (r RegistryPath) Host() string {
 	return hostTokens[0]
 }
 
-// Repository is the repository in the registry path
+// Repository is the repository in the registry path.
 func (r RegistryPath) Repository() string {
 	repository := string(r)
 

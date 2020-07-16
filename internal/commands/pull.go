@@ -42,7 +42,7 @@ func runPullCommand(logger *log.Logger, location string, manifestPath string) er
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClientWithLogger(logger)
+	client, err := docker.NewLoggerClient(logger.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -74,7 +74,7 @@ func runPullCommand(logger *log.Logger, location string, manifestPath string) er
 		}
 
 		if !exists {
-			client.Logger.Printf("[PULL] Image %s is missing and will be pulled.", pullImage)
+			client.LogInfo("[PULL] Image %s is missing and will be pulled.", pullImage)
 			imagesToPull[pullImage] = auth
 		}
 	}
@@ -85,7 +85,7 @@ func runPullCommand(logger *log.Logger, location string, manifestPath string) er
 		}
 	}
 
-	client.Logger.Printf("[PULL] All images have been pulled!")
+	client.LogInfo("[PULL] All images have been pulled!")
 
 	return nil
 }

@@ -43,7 +43,7 @@ func runCheckCommand(logger *log.Logger, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := docker.NewClientWithLogger(logger)
+	client, err := docker.NewLoggerClient(logger.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -74,7 +74,7 @@ func runCheckCommand(logger *log.Logger, manifestPath string) error {
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			client.Logger.Printf("[CHECK] Image %s has an invalid version. Skipping ...", image)
+			client.LogInfo("[CHECK] Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
@@ -91,11 +91,11 @@ func runCheckCommand(logger *log.Logger, manifestPath string) error {
 		}
 
 		if len(newerVersions) == 0 {
-			client.Logger.Printf("[CHECK] Image %s is up to date!", image)
+			client.LogInfo("[CHECK] Image %s is up to date!", image)
 			continue
 		}
 
-		client.Logger.Printf("[CHECK] New versions for %v found: %v", image, newerVersions)
+		client.LogInfo("[CHECK] New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil
@@ -114,8 +114,8 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 		}
 	}
 
-	// For images that are very out of date, the list can be quite long
-	// Only return the latest 5 releases to keep the list manageable
+	// For images that are very out of date, the number of newer versions can be quite long.
+	// Only return the latest 5 releases to keep the list manageable.
 	if len(newerVersions) > 5 {
 		newerVersions = newerVersions[len(newerVersions)-5:]
 	}
@@ -123,7 +123,8 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 	return newerVersions, nil
 }
 
-// filterTags filters out tags that would not be desirable to update to
+// filterTags filters out tags that would not be desirable to update to.
+// This includes malformed tags and pre-releases.
 func filterTags(tags []string) []string {
 	var filteredTags []string
 	for _, tag := range tags {
@@ -137,7 +138,7 @@ func filterTags(tags []string) []string {
 		}
 
 		// This will remove tags that include architectures and other strings
-		// not necessarily related to a release
+		// not necessarily related to a release.
 		allowedPreReleases := []string{"alpha", "beta", "rc"}
 		if strings.Contains(tag, "-") && !containsSubstring(allowedPreReleases, tag) {
 			continue

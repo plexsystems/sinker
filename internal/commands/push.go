@@ -41,7 +41,7 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClientWithLogger(logger)
+	client, err := docker.NewLoggerClient(logger.Infof)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
@@ -105,7 +105,7 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 		}
 	}
 
-	client.Logger.Printf("[PUSH] All images have been pushed!")
+	client.LogInfo("[PUSH] All images have been pushed!")
 
 	return nil
 }
