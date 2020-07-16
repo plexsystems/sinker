@@ -118,6 +118,7 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 	// Only return the latest 5 releases to keep the list manageable.
 	if len(newerVersions) > 5 {
 		newerVersions = newerVersions[len(newerVersions)-5:]
+		newerVersions = append([]string{"..."}, newerVersions...)
 	}
 
 	return newerVersions, nil
