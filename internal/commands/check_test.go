@@ -36,7 +36,7 @@ func TestNewerVersions(t *testing.T) {
 		t.Fatal("get newer versions:", err)
 	}
 
-	expected := []string{"v2.0.0", "v3.0.0", "v4.0.0", "v5.0.0", "v6.0.0"}
+	expected := []string{"...", "v2.0.0", "v3.0.0", "v4.0.0", "v5.0.0", "v6.0.0"}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("unexpected filtering of tags. expected %v actual %v", expected, actual)
