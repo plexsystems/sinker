@@ -4,13 +4,12 @@ import (
 	"os"
 	"path"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 // NewDefaultCommand creates the default command.
-func NewDefaultCommand(logger *log.Logger) *cobra.Command {
+func NewDefaultCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
@@ -24,9 +23,9 @@ func NewDefaultCommand(logger *log.Logger) *cobra.Command {
 	cmd.AddCommand(newCreateCommand())
 	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newListCommand())
-	cmd.AddCommand(newPullCommand(logger))
-	cmd.AddCommand(newPushCommand(logger))
-	cmd.AddCommand(newCheckCommand(logger))
+	cmd.AddCommand(newPullCommand())
+	cmd.AddCommand(newPushCommand())
+	cmd.AddCommand(newCheckCommand())
 
 	return &cmd
 }

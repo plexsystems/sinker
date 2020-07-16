@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newPushCommand(logger *log.Logger) *cobra.Command {
+func newPushCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "push",
 		Short: "Push images in the manifest to the target repository",
@@ -24,7 +24,7 @@ func newPushCommand(logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPushCommand(logger, manifestPath); err != nil {
+			if err := runPushCommand(manifestPath); err != nil {
 				return fmt.Errorf("push: %w", err)
 			}
 
@@ -37,11 +37,11 @@ func newPushCommand(logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPushCommand(logger *log.Logger, manifestPath string) error {
+func runPushCommand(manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewLoggerClient(logger.Infof)
+	client, err := docker.NewLoggerClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
@@ -51,7 +51,7 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	logger.Printf("[INFO] Finding images that need to be pushed ...")
+	log.Printf("[INFO] Finding images that need to be pushed ...")
 
 	var sourcesToPush []manifest.Source
 	for _, source := range imageManifest.Sources {
@@ -66,13 +66,13 @@ func runPushCommand(logger *log.Logger, manifestPath string) error {
 	}
 
 	if len(sourcesToPush) == 0 {
-		logger.Println("[INFO] All images are up to date!")
+		log.Println("[INFO] All images are up to date!")
 		return nil
 	}
 
 	if viper.GetBool("dryrun") {
 		for _, source := range sourcesToPush {
-			logger.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
+			log.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}

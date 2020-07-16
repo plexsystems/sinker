@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newCheckCommand(logger *log.Logger) *cobra.Command {
+func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the source registry",
@@ -26,7 +26,7 @@ func newCheckCommand(logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runCheckCommand(logger, manifestPath); err != nil {
+			if err := runCheckCommand(manifestPath); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -39,11 +39,11 @@ func newCheckCommand(logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(logger *log.Logger, manifestPath string) error {
+func runCheckCommand(manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := docker.NewLoggerClient(logger.Infof)
+	client, err := docker.NewLoggerClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}

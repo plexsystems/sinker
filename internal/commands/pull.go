@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newPullCommand(logger *log.Logger) *cobra.Command {
+func newPullCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
 		Short:     "Pull the source or target images found in the image manifest",
@@ -27,7 +27,7 @@ func newPullCommand(logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(logger, location, manifestPath); err != nil {
+			if err := runPullCommand(location, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -38,11 +38,11 @@ func newPullCommand(logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(logger *log.Logger, location string, manifestPath string) error {
+func runPullCommand(location string, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewLoggerClient(logger.Infof)
+	client, err := docker.NewLoggerClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}

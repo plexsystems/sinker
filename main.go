@@ -14,7 +14,7 @@ func main() {
 		FullTimestamp: false,
 	})
 
-	if err := commands.NewDefaultCommand(logrusLogger).Execute(); err != nil {
+	if err := commands.NewDefaultCommand().Execute(); err != nil {
 		os.Exit(1)
 	}
 }
