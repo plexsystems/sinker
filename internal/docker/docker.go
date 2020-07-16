@@ -178,19 +178,17 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 		return false, fmt.Errorf("parse ref: %w", err)
 	}
 
-	_, err = remote.Get(imageReference, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	if _, err := remote.Get(imageReference, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
+		var transportError *transport.Error
+		if !errors.As(err, &transportError) {
+			return false, fmt.Errorf("get image: %w", err)
+		}
 
-	var transportError *transport.Error
-	if errors.As(err, &transportError) {
 		for _, diagnostic := range transportError.Errors {
 			if strings.EqualFold("MANIFEST_UNKNOWN", string(diagnostic.Code)) {
 				return false, nil
 			}
 		}
-	}
-
-	if err != nil {
-		return false, fmt.Errorf("get image: %w", err)
 	}
 
 	return true, nil
