@@ -29,8 +29,8 @@ type Client struct {
 	LogInfo func(format string, args ...interface{})
 }
 
-// NewLoggerClient returns a Docker client configured with the given information logger.
-func NewLoggerClient(logInfo func(format string, args ...interface{})) (Client, error) {
+// NewClient returns a Docker client configured with the given information logger.
+func NewClient(logInfo func(format string, args ...interface{})) (Client, error) {
 	retry.DefaultDelay = 10 * time.Second
 	retry.DefaultAttempts = 2
 

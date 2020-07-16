@@ -43,7 +43,7 @@ func runCheckCommand(manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := docker.NewLoggerClient(log.Infof)
+	client, err := docker.NewClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}

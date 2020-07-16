@@ -41,7 +41,7 @@ func runPushCommand(manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewLoggerClient(log.Infof)
+	client, err := docker.NewClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new docker client: %w", err)
 	}
