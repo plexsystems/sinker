@@ -1,4 +1,4 @@
-package commands
+package manifest
 
 import (
 	"bytes"
@@ -17,7 +17,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func getImagesFromKubernetesManifests(path string, target Target) ([]SourceImage, error) {
+// GetImagesFromKubernetesManifests returns all images found in Kubernetes manifests
+// that are located at the specified path.
+func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -106,8 +108,8 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	return yamlFiles, nil
 }
 
-func marshalImages(images []string, target Target) ([]SourceImage, error) {
-	var containerImages []SourceImage
+func marshalImages(images []string, target Target) ([]Source, error) {
+	var containerImages []Source
 	for _, image := range images {
 		path := docker.RegistryPath(image)
 
@@ -117,13 +119,13 @@ func marshalImages(images []string, target Target) ([]SourceImage, error) {
 		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
 		sourceRepository = strings.TrimLeft(sourceRepository, "/")
 
-		sourceImage := SourceImage{
+		source := Source{
 			Host:       sourceHost,
 			Repository: sourceRepository,
 			Tag:        path.Tag(),
 		}
 
-		containerImages = append(containerImages, sourceImage)
+		containerImages = append(containerImages, source)
 	}
 
 	return containerImages, nil
@@ -147,11 +149,10 @@ func getSourceHostFromRepository(repository string) string {
 }
 
 func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
-	var images []string
-	var typeMeta metav1.TypeMeta
 
 	// If the yaml does not contain a TypeMeta, it will not be a valid
-	// Kubernetes resource and can be assumed to have no images
+	// Kubernetes resource and can be assumed to have no images.
+	var typeMeta metav1.TypeMeta
 	if err := kubeyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
 		return []string{}, nil
 	}
@@ -162,9 +163,7 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 			return nil, fmt.Errorf("get prometheus images: %w", err)
 		}
 
-		images = append(images, prometheusImages...)
-
-		return images, nil
+		return prometheusImages, nil
 	}
 
 	if typeMeta.Kind == "Alertmanager" {
@@ -173,9 +172,7 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 			return nil, fmt.Errorf("get alertmanager images: %w", err)
 		}
 
-		images = append(images, alertmanagerImages...)
-
-		return images, nil
+		return alertmanagerImages, nil
 	}
 
 	type BaseSpec struct {
@@ -191,6 +188,7 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 		return []string{}, nil
 	}
 
+	var images []string
 	images = append(images, getImagesFromContainers(contents.Spec.Template.Spec.InitContainers)...)
 	images = append(images, getImagesFromContainers(contents.Spec.Template.Spec.Containers)...)
 
@@ -198,7 +196,6 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 }
 
 func getPrometheusImages(yamlFile []byte) ([]string, error) {
-	var images []string
 	var prometheus promv1.Prometheus
 	if err := kubeyaml.Unmarshal(yamlFile, &prometheus); err != nil {
 		return nil, fmt.Errorf("unmarshal prometheus: %w", err)
@@ -211,21 +208,15 @@ func getPrometheusImages(yamlFile []byte) ([]string, error) {
 		prometheusImage = *prometheus.Spec.Image
 	}
 
-	if len(prometheus.Spec.Containers) > 0 {
-		images = append(images, getImagesFromContainers(prometheus.Spec.Containers)...)
-	}
-
-	if len(prometheus.Spec.InitContainers) > 0 {
-		images = append(images, getImagesFromContainers(prometheus.Spec.InitContainers)...)
-	}
-
+	var images []string
+	images = append(images, getImagesFromContainers(prometheus.Spec.Containers)...)
+	images = append(images, getImagesFromContainers(prometheus.Spec.InitContainers)...)
 	images = append(images, prometheusImage)
 
 	return images, nil
 }
 
 func getAlertmanagerImages(yamlFile []byte) ([]string, error) {
-	var images []string
 	var alertmanager promv1.Alertmanager
 	if err := kubeyaml.Unmarshal(yamlFile, &alertmanager); err != nil {
 		return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
@@ -238,14 +229,9 @@ func getAlertmanagerImages(yamlFile []byte) ([]string, error) {
 		alertmanagerImage = *alertmanager.Spec.Image
 	}
 
-	if len(alertmanager.Spec.Containers) > 0 {
-		images = append(images, getImagesFromContainers(alertmanager.Spec.Containers)...)
-	}
-
-	if len(alertmanager.Spec.InitContainers) > 0 {
-		images = append(images, getImagesFromContainers(alertmanager.Spec.InitContainers)...)
-	}
-
+	var images []string
+	images = append(images, getImagesFromContainers(alertmanager.Spec.Containers)...)
+	images = append(images, getImagesFromContainers(alertmanager.Spec.InitContainers)...)
 	images = append(images, alertmanagerImage)
 
 	return images, nil

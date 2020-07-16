@@ -2,17 +2,18 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
+	"github.com/plexsystems/sinker/internal/manifest"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
+func newPullCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
 		Short:     "Pull the source or target images found in the image manifest",
@@ -26,7 +27,7 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(ctx, logger, location, manifestPath); err != nil {
+			if err := runPullCommand(location, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -37,32 +38,31 @@ func newPullCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(ctx context.Context, logger *log.Logger, location string, manifestPath string) error {
-	client, err := docker.NewClient(logger)
+func runPullCommand(location string, manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	client, err := docker.NewClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := GetManifest(manifestPath)
+	manifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	if len(manifest.Images) == 0 {
-		return errors.New("no images found in the image manifest")
-	}
-
 	imagesToPull := make(map[string]string)
-	for _, image := range manifest.Images {
+	for _, source := range manifest.Sources {
 		var pullImage string
 		var auth string
 		var err error
 		if location == "target" {
-			pullImage = image.TargetImage()
-			auth, err = getEncodedTargetAuth(image.Target)
+			pullImage = source.TargetImage()
+			auth, err = source.Target.EncodedAuth()
 		} else {
-			pullImage = image.String()
-			auth, err = getEncodedSourceAuth(image)
+			pullImage = source.Image()
+			auth, err = source.EncodedAuth()
 		}
 		if err != nil {
 			return fmt.Errorf("get %s auth: %w", location, err)
@@ -74,7 +74,7 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, ma
 		}
 
 		if !exists {
-			client.Logger.Printf("[PULL] Image %s is missing and will be pulled.", pullImage)
+			client.LogInfo("[PULL] Image %s is missing and will be pulled.", pullImage)
 			imagesToPull[pullImage] = auth
 		}
 	}
@@ -85,7 +85,7 @@ func runPullCommand(ctx context.Context, logger *log.Logger, location string, ma
 		}
 	}
 
-	client.Logger.Printf("[PULL] All images have been pulled!")
+	client.LogInfo("[PULL] All images have been pulled!")
 
 	return nil
 }

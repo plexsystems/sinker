@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
+	"github.com/plexsystems/sinker/internal/manifest"
 
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
+func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images in the source registry",
@@ -24,7 +26,7 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runCheckCommand(ctx, logger, manifestPath); err != nil {
+			if err := runCheckCommand(manifestPath); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -37,8 +39,11 @@ func newCheckCommand(ctx context.Context, logger *log.Logger) *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath string) error {
-	client, err := docker.NewClient(logger)
+func runCheckCommand(manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client, err := docker.NewClient(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -47,13 +52,13 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 	if len(viper.GetStringSlice("images")) > 0 {
 		imagesToCheck = viper.GetStringSlice("images")
 	} else {
-		manifest, err := GetManifest(manifestPath)
+		manifest, err := manifest.Get(manifestPath)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}
 
-		for _, image := range manifest.Images {
-			imagesToCheck = append(imagesToCheck, image.String())
+		for _, source := range manifest.Sources {
+			imagesToCheck = append(imagesToCheck, source.Image())
 		}
 	}
 
@@ -69,7 +74,7 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			client.Logger.Printf("[CHECK] Image %s has an invalid version. Skipping ...", image)
+			client.LogInfo("[CHECK] Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
@@ -86,11 +91,11 @@ func runCheckCommand(ctx context.Context, logger *log.Logger, manifestPath strin
 		}
 
 		if len(newerVersions) == 0 {
-			client.Logger.Printf("[CHECK] Image %s is up to date!", image)
+			client.LogInfo("[CHECK] Image %s is up to date!", image)
 			continue
 		}
 
-		client.Logger.Printf("[CHECK] New versions for %v found: %v", image, newerVersions)
+		client.LogInfo("[CHECK] New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil
@@ -109,16 +114,18 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 		}
 	}
 
-	// For images that are very out of date, the list can be quite long
-	// Only return the latest 5 releases to keep the list manageable
+	// For images that are very out of date, the number of newer versions can be quite long.
+	// Only return the latest 5 releases to keep the list manageable.
 	if len(newerVersions) > 5 {
 		newerVersions = newerVersions[len(newerVersions)-5:]
+		newerVersions = append([]string{"..."}, newerVersions...)
 	}
 
 	return newerVersions, nil
 }
 
-// filterTags filters out tags that would not be desirable to update to
+// filterTags filters out tags that would not be desirable to update to.
+// This includes malformed tags and pre-releases.
 func filterTags(tags []string) []string {
 	var filteredTags []string
 	for _, tag := range tags {
@@ -132,7 +139,7 @@ func filterTags(tags []string) []string {
 		}
 
 		// This will remove tags that include architectures and other strings
-		// not necessarily related to a release
+		// not necessarily related to a release.
 		allowedPreReleases := []string{"alpha", "beta", "rc"}
 		if strings.Contains(tag, "-") && !containsSubstring(allowedPreReleases, tag) {
 			continue

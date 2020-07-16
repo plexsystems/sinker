@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/plexsystems/sinker/internal/manifest"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -11,7 +13,7 @@ import (
 func newListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "list <source|target>",
-		Short:     "List the images found in the image manifest",
+		Short:     "List the images found in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 
@@ -40,17 +42,17 @@ func newListCommand() *cobra.Command {
 }
 
 func runListCommand(location string, manifestPath string) error {
-	manifest, err := GetManifest(manifestPath)
+	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
 	var listImages []string
-	for _, image := range manifest.Images {
+	for _, source := range imageManifest.Sources {
 		if location == "target" {
-			listImages = append(listImages, image.TargetImage())
+			listImages = append(listImages, source.TargetImage())
 		} else {
-			listImages = append(listImages, image.String())
+			listImages = append(listImages, source.Image())
 		}
 	}
 
