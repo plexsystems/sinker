@@ -221,9 +221,9 @@ func getStatusMessage(status statusLine) string {
 }
 
 func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image string, command string) error {
-	var status statusLine
 	var scans int
 	for clientScanner.Scan() {
+		var status statusLine
 		if err := json.Unmarshal(clientScanner.Bytes(), &status); err != nil {
 			return fmt.Errorf("unmarshal status: %w", err)
 		}
