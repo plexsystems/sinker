@@ -123,6 +123,7 @@ func marshalImages(images []string, target Target) ([]Source, error) {
 			Host:       sourceHost,
 			Repository: sourceRepository,
 			Tag:        path.Tag(),
+			Digest:     path.Digest(),
 		}
 
 		containerImages = append(containerImages, source)

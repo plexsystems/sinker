@@ -16,10 +16,18 @@ func newUpdateCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sourcePath := args[0]
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("bind output flag: %w", err)
+			}
 
+			outputPath := viper.GetString("manifest")
+			if viper.GetString("output") != "" {
+				outputPath = viper.GetString("output")
+			}
+
+			sourcePath := args[0]
 			manifestPath := viper.GetString("manifest")
-			if err := runUpdateCommand(sourcePath, manifestPath); err != nil {
+			if err := runUpdateCommand(sourcePath, manifestPath, outputPath); err != nil {
 				return fmt.Errorf("update: %w", err)
 			}
 
@@ -27,10 +35,12 @@ func newUpdateCommand() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringP("output", "o", "", "Path where the updated manifest file will be written to (defaults to the current manifest file")
+
 	return &cmd
 }
 
-func runUpdateCommand(path string, manifestPath string) error {
+func runUpdateCommand(path string, manifestPath string, outputPath string) error {
 	currentManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get current manifest: %w", err)
@@ -51,12 +61,20 @@ func runUpdateCommand(path string, manifestPath string) error {
 				continue
 			}
 
+			// sdkfjsdkf .....
 			updatedManifest.Sources[u].Auth = currentManifest.Sources[c].Auth
-			updatedManifest.Sources[u].Target = currentManifest.Sources[c].Target
+
+			if currentManifest.Sources[c].Target.Host != currentManifest.Target.Host {
+				updatedManifest.Sources[u].Target.Host = currentManifest.Sources[c].Target.Host
+			}
+
+			if currentManifest.Sources[c].Target.Repository != currentManifest.Target.Repository {
+				updatedManifest.Sources[u].Target.Repository = currentManifest.Sources[c].Target.Repository
+			}
 		}
 	}
 
-	if err := updatedManifest.Write(manifestPath); err != nil {
+	if err := updatedManifest.Write(outputPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 

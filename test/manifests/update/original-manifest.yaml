@@ -1,18 +1,13 @@
 target:
-  host: mycompany.com
-  repository: myrepo
+  host: myhost.com
 sources:
-- repository: coreos/prometheus-operator
-  host: quay.io
-  tag: v0.40.0
-- repository: jimmidyson/configmap-reload
-  tag: v0.3.0
-  target:
-    host: MY_HOST
-    repository: MY_REPO
-- repository: coreos/prometheus-config-reloader
-  host: quay.io
-  tag: v0.39.0
+- repository: some/image
+  tag: v1.0.0
   auth:
     username: MY_USER
     password: MY_PASS
+- repository: some/repo
+  target:
+    host: MY_HOST
+    repository: MY_REPO
+  digest: sha256:abc123

@@ -21,12 +21,20 @@ func newCreateCommand() *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("bind output flag: %w", err)
+			}
+
 			var resourcePath string
 			if len(args) > 0 {
 				resourcePath = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
+			if manifestPath == "" {
+				manifestPath = viper.GetString("output")
+			}
+
 			if err := runCreateCommand(resourcePath, manifestPath); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
@@ -36,6 +44,7 @@ func newCreateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("target", "t", "", "The target repository to sync images to (e.g. organization.com/repo)")
+	cmd.Flags().StringP("output", "o", "", "Path where the manifest file will be written to (defaults to .images.yaml in the current directory)")
 	cmd.MarkFlagRequired("target")
 
 	return &cmd

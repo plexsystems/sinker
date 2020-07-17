@@ -1,30 +1,19 @@
-# original manifest has 0.3.0
-# updated manifest has 0.4.0
-# update configmap-reload from 0.3.0 to 0.4.0
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prometheus-operator
+  name: test-update
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: controller
-      app.kubernetes.io/name: prometheus-operator
+      app.kubernetes.io/component: test-update
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: controller
-        app.kubernetes.io/name: prometheus-operator
+        app.kubernetes.io/component: test-update
     spec:
       containers:
       - args:
-        - --config-reloader-image=jimmidyson/configmap-reload:v0.4.0
-        - --prometheus-config-reloader=quay.io/coreos/prometheus-config-reloader:v0.39.0
-        image: quay.io/coreos/prometheus-operator:v0.40.0
-        name: prometheus-operator
-        ports:
-        - containerPort: 8080
-          name: http
-      serviceAccountName: prometheus-operator
+        - --test-digest=some/repo@sha256:abc123
+        image: some/image:v2.0.0
+        name: test-update
