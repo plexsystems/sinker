@@ -53,28 +53,18 @@ func runPullCommand(origin string, manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	imageManifest, err := manifest.Get(manifestPath)
+	var images map[string]string
+	if len(viper.GetStringSlice("images")) > 0 {
+		images, err = getImagesFromCommandLine(viper.GetStringSlice("images"))
+	} else {
+		images, err = getImagesFromManifest(manifestPath, origin)
+	}
 	if err != nil {
-		return fmt.Errorf("get manifest: %w", err)
+		return fmt.Errorf("get images: %w", err)
 	}
 
 	imagesToPull := make(map[string]string)
-	for _, source := range imageManifest.Sources {
-		var image string
-		var auth string
-
-		var err error
-		if origin == "target" {
-			image = source.TargetImage()
-			auth, err = source.Target.EncodedAuth()
-		} else {
-			image = source.Image()
-			auth, err = source.EncodedAuth()
-		}
-		if err != nil {
-			return fmt.Errorf("get %s auth: %w", origin, err)
-		}
-
+	for image, auth := range images {
 		exists, err := client.ImageExistsOnHost(ctx, image)
 		if err != nil {
 			return fmt.Errorf("image host existance: %w", err)
@@ -95,4 +85,49 @@ func runPullCommand(origin string, manifestPath string) error {
 	log.Infof("[PULL] All images have been pulled!")
 
 	return nil
+}
+
+func getImagesFromManifest(path string, origin string) (map[string]string, error) {
+	imageManifest, err := manifest.Get(path)
+	if err != nil {
+		return nil, fmt.Errorf("get manifest: %w", err)
+	}
+
+	images := make(map[string]string)
+	for _, source := range imageManifest.Sources {
+		var image string
+		var auth string
+
+		var err error
+		if origin == "target" {
+			image = source.TargetImage()
+			auth, err = source.Target.EncodedAuth()
+		} else {
+			image = source.Image()
+			auth, err = source.EncodedAuth()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("get %s auth: %w", origin, err)
+		}
+
+		images[image] = auth
+	}
+
+	return images, nil
+}
+
+func getImagesFromCommandLine(images []string) (map[string]string, error) {
+	imgs := make(map[string]string)
+	for _, image := range images {
+		registryPath := docker.RegistryPath(image)
+
+		auth, err := docker.GetEncodedAuthForHost(registryPath.Host())
+		if err != nil {
+			return nil, fmt.Errorf("get auth: %w", err)
+		}
+
+		imgs[image] = auth
+	}
+
+	return imgs, nil
 }
