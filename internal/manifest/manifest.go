@@ -118,8 +118,7 @@ func (t Target) EncodedAuth() (string, error) {
 		return auth, nil
 	}
 
-	authHost := getAuthHostFromRegistryHost(t.Host)
-	auth, err := docker.GetEncodedAuthForHost(authHost)
+	auth, err := docker.GetEncodedAuthForHost(t.Host)
 	if err != nil {
 		return "", fmt.Errorf("get encoded auth for host: %w", err)
 	}
@@ -197,21 +196,12 @@ func (s Source) EncodedAuth() (string, error) {
 		return auth, nil
 	}
 
-	authHost := getAuthHostFromRegistryHost(s.Host)
-	auth, err := docker.GetEncodedAuthForHost(authHost)
+	auth, err := docker.GetEncodedAuthForHost(s.Host)
 	if err != nil {
 		return "", fmt.Errorf("get encoded auth for host: %w", err)
 	}
 
 	return auth, nil
-}
-
-func getAuthHostFromRegistryHost(host string) string {
-	if host == "" || host == "docker.io" {
-		return "https://index.docker.io/v1/"
-	}
-
-	return host
 }
 
 func getManifestLocation(path string) string {

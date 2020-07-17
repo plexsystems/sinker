@@ -6,7 +6,6 @@ require (
 	github.com/avast/retry-go v2.6.0+incompatible
 	github.com/containerd/containerd v1.3.6 // indirect
 	github.com/coreos/prometheus-operator v0.40.0
-	github.com/docker/cli v0.0.0-20191017083524-a8ff7f821017
 	github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-containerregistry v0.1.1
@@ -17,6 +16,6 @@ require (
 	github.com/spf13/viper v1.7.0
 	google.golang.org/grpc v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.18.5
-	k8s.io/apimachinery v0.18.5
+	k8s.io/api v0.18.6
+	k8s.io/apimachinery v0.18.6
 )

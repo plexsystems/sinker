@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/docker/cli/cli/config"
-	"github.com/docker/cli/cli/config/credentials"
-	"github.com/docker/cli/cli/config/types"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 // GetEncodedBasicAuth encodes a username and password into Base64.
 func GetEncodedBasicAuth(username string, password string) (string, error) {
-	authConfig := types.AuthConfig{
+	authConfig := authn.AuthConfig{
 		Username: username,
 		Password: password,
 	}
@@ -28,18 +27,19 @@ func GetEncodedBasicAuth(username string, password string) (string, error) {
 
 // GetEncodedAuthForHost returns a Base64 encoded auth for the given host.
 func GetEncodedAuthForHost(host string) (string, error) {
-	cfg, err := config.Load(config.Dir())
+	registryReference, err := name.NewRegistry(host, name.WeakValidation)
 	if err != nil {
-		return "", fmt.Errorf("loading docker config: %w", err)
+		return "", fmt.Errorf("new registry: %w", err)
 	}
 
-	if !cfg.ContainsAuth() {
-		cfg.CredentialsStore = credentials.DetectDefaultStore(cfg.CredentialsStore)
+	auth, err := authn.DefaultKeychain.Resolve(registryReference)
+	if err != nil {
+		return "", fmt.Errorf("resolve auth: %w", err)
 	}
 
-	authConfig, err := cfg.GetAuthConfig(host)
+	authConfig, err := auth.Authorization()
 	if err != nil {
-		return "", fmt.Errorf("getting auth config: %w", err)
+		return "", fmt.Errorf("get auth: %w", err)
 	}
 
 	jsonAuth, err := json.Marshal(authConfig)
