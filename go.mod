@@ -16,6 +16,6 @@ require (
 	github.com/spf13/viper v1.7.0
 	google.golang.org/grpc v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.18.5
-	k8s.io/apimachinery v0.18.5
+	k8s.io/api v0.18.6
+	k8s.io/apimachinery v0.18.6
 )
