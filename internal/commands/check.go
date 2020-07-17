@@ -50,12 +50,12 @@ func runCheckCommand(manifestPath string) error {
 
 	imagesToCheck := viper.GetStringSlice("images")
 	if len(imagesToCheck) == 0 {
-		manifest, err := manifest.Get(manifestPath)
+		imageManifest, err := manifest.Get(manifestPath)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}
 
-		for _, source := range manifest.Sources {
+		for _, source := range imageManifest.Sources {
 			imagesToCheck = append(imagesToCheck, source.Image())
 		}
 	}

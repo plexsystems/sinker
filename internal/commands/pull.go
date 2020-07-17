@@ -16,7 +16,7 @@ import (
 func newPullCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
-		Short:     "Pull the source or target images found in the image manifest",
+		Short:     "Pull the source or target images found in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 
@@ -47,13 +47,13 @@ func runPullCommand(location string, manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := manifest.Get(manifestPath)
+	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
 	imagesToPull := make(map[string]string)
-	for _, source := range manifest.Sources {
+	for _, source := range imageManifest.Sources {
 		var image string
 		var auth string
 

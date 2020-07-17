@@ -15,6 +15,11 @@
   git diff --quiet -- example/.images.yaml
 }
 
+@test "[UPDATE] Updated manifest matches expected manifest output" {
+  run ./sinker update test/update/bundle.yaml --manifest test/update/original.yaml --output test/update/expected.yaml
+  git diff --quiet -- test/update/updated-manifest.yaml
+}
+
 @test "[LIST] Source matches example source list" {
   run ./sinker list source --manifest example --output example/source.txt
   git diff --quiet -- example/source.txt
@@ -26,17 +31,17 @@
 }
 
 @test "[PUSH] --dryrun flag lists missing images" {
-  run ./sinker push --dryrun --manifest test/manifests/dryrun-images.yaml
+  run ./sinker push --dryrun --manifest test/push/dryrun-images.yaml
   [[ "$output" =~ "Image busybox:1.32.0 would be pushed as plexsystems/busybox:1.32.0" ]]
 }
 
 @test "[PUSH] All images are pushed" {
-  run ./sinker push --manifest test/manifests/latest-images.yaml
+  run ./sinker push --manifest test/push/latest-images.yaml
   [[ "$output" =~ "All images have been pushed!" ]]
 }
 
 @test "[PUSH] All images with digests are pushed" {
-  run ./sinker push --manifest test/manifests/digest-images.yaml
+  run ./sinker push --manifest test/push/digest-images.yaml
   [[ "$output" =~ "All images are up to date!" ]]
 }
 

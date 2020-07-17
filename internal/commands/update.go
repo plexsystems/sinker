@@ -12,7 +12,7 @@ import (
 func newUpdateCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "update <source>",
-		Short: "Update an existing image manifest",
+		Short: "Update an existing manifest",
 		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,7 +35,7 @@ func newUpdateCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "", "Path where the updated manifest file will be written to (defaults to the current manifest file")
+	cmd.Flags().StringP("output", "o", "", "Path where the updated manifest file will be written to (defaults to the current manifest file)")
 
 	return &cmd
 }
@@ -46,35 +46,38 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	updatedManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
+	imageManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
 	if err != nil {
-		return fmt.Errorf("get current manifest: %w", err)
+		return fmt.Errorf("get new manifest: %w", err)
 	}
 
-	for u := range updatedManifest.Sources {
+	for u := range imageManifest.Sources {
 		for c := range currentManifest.Sources {
-			if currentManifest.Sources[c].Repository != updatedManifest.Sources[u].Repository {
+			if currentManifest.Sources[c].Repository != imageManifest.Sources[u].Repository {
 				continue
 			}
 
-			if currentManifest.Sources[c].Host != updatedManifest.Sources[u].Host {
+			if currentManifest.Sources[c].Host != imageManifest.Sources[u].Host {
 				continue
 			}
 
-			// sdkfjsdkf .....
-			updatedManifest.Sources[u].Auth = currentManifest.Sources[c].Auth
-
+			// If the target host (or repository) of a source does not match the root
+			// target host (or repository), it has been modified by the user.
+			//
+			// To preserve the current settings and not overwrite them, set the
+			// manifest host and repository values to the ones present in the current manifest.
 			if currentManifest.Sources[c].Target.Host != currentManifest.Target.Host {
-				updatedManifest.Sources[u].Target.Host = currentManifest.Sources[c].Target.Host
+				imageManifest.Sources[u].Target.Host = currentManifest.Sources[c].Target.Host
+			}
+			if currentManifest.Sources[c].Target.Repository != currentManifest.Target.Repository {
+				imageManifest.Sources[u].Target.Repository = currentManifest.Sources[c].Target.Repository
 			}
 
-			if currentManifest.Sources[c].Target.Repository != currentManifest.Target.Repository {
-				updatedManifest.Sources[u].Target.Repository = currentManifest.Sources[c].Target.Repository
-			}
+			imageManifest.Sources[u].Auth = currentManifest.Sources[c].Auth
 		}
 	}
 
-	if err := updatedManifest.Write(outputPath); err != nil {
+	if err := imageManifest.Write(outputPath); err != nil {
 		return fmt.Errorf("writing manifest: %w", err)
 	}
 
