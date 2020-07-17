@@ -6,7 +6,6 @@ require (
 	github.com/avast/retry-go v2.6.0+incompatible
 	github.com/containerd/containerd v1.3.6 // indirect
 	github.com/coreos/prometheus-operator v0.40.0
-	github.com/docker/cli v0.0.0-20191017083524-a8ff7f821017
 	github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-containerregistry v0.1.1
