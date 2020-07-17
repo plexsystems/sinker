@@ -203,6 +203,32 @@ func (s Source) EncodedAuth() (string, error) {
 	return auth, nil
 }
 
+// GetSourcesFromImages returns the given images as sources with the specified target.
+func GetSourcesFromImages(images []string, target string) []Source {
+	targetRegistryPath := docker.RegistryPath(target)
+	sourceTarget := Target{
+		Host:       targetRegistryPath.Host(),
+		Repository: targetRegistryPath.Repository(),
+	}
+
+	var sources []Source
+	for _, image := range images {
+		registryPath := docker.RegistryPath(image)
+
+		source := Source{
+			Host:       registryPath.Host(),
+			Target:     sourceTarget,
+			Repository: registryPath.Repository(),
+			Tag:        registryPath.Tag(),
+			Digest:     registryPath.Digest(),
+		}
+
+		sources = append(sources, source)
+	}
+
+	return sources
+}
+
 func getManifestLocation(path string) string {
 	const defaultManifestFileName = ".images.yaml"
 

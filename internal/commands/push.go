@@ -23,6 +23,14 @@ func newPushCommand() *cobra.Command {
 				return fmt.Errorf("bind dryrun flag: %w", err)
 			}
 
+			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
+				return fmt.Errorf("bind images flag: %w", err)
+			}
+
+			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
+				return fmt.Errorf("bind target flag: %w", err)
+			}
+
 			manifestPath := viper.GetString("manifest")
 			if err := runPushCommand(manifestPath); err != nil {
 				return fmt.Errorf("push: %w", err)
@@ -33,6 +41,8 @@ func newPushCommand() *cobra.Command {
 	}
 
 	cmd.Flags().Bool("dryrun", false, "Print a list of images that would be pushed to the target")
+	cmd.Flags().StringSliceP("images", "i", []string{}, "List of images to push to target")
+	cmd.Flags().StringP("target", "t", "", "Registry the images will be pushed to")
 
 	return &cmd
 }
@@ -46,38 +56,45 @@ func runPushCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	imageManifest, err := manifest.Get(manifestPath)
-	if err != nil {
-		return fmt.Errorf("get manifest: %w", err)
+	var sources []manifest.Source
+	if len(viper.GetStringSlice("images")) > 0 {
+		sources = manifest.GetSourcesFromImages(viper.GetStringSlice("images"), viper.GetString("target"))
+	} else {
+		imageManifest, err := manifest.Get(manifestPath)
+		if err != nil {
+			return fmt.Errorf("get manifest: %w", err)
+		}
+
+		sources = imageManifest.Sources
 	}
 
 	log.Printf("[INFO] Finding images that need to be pushed ...")
 
-	var sources []manifest.Source
-	for _, source := range imageManifest.Sources {
+	var sourcesToPush []manifest.Source
+	for _, source := range sources {
 		exists, err := client.ImageExistsAtRemote(ctx, source.TargetImage())
 		if err != nil {
 			return fmt.Errorf("image exists at remote: %w", err)
 		}
 
 		if !exists {
-			sources = append(sources, source)
+			sourcesToPush = append(sourcesToPush, source)
 		}
 	}
 
-	if len(sources) == 0 {
+	if len(sourcesToPush) == 0 {
 		log.Println("[INFO] All images are up to date!")
 		return nil
 	}
 
 	if viper.GetBool("dryrun") {
-		for _, source := range sources {
+		for _, source := range sourcesToPush {
 			log.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}
 
-	for _, source := range sources {
+	for _, source := range sourcesToPush {
 		exists, err := client.ImageExistsOnHost(ctx, source.Image())
 		if err != nil {
 			return fmt.Errorf("image exists: %w", err)
