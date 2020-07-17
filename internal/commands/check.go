@@ -48,10 +48,8 @@ func runCheckCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	var imagesToCheck []string
-	if len(viper.GetStringSlice("images")) > 0 {
-		imagesToCheck = viper.GetStringSlice("images")
-	} else {
+	imagesToCheck := viper.GetStringSlice("images")
+	if len(imagesToCheck) == 0 {
 		manifest, err := manifest.Get(manifestPath)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
@@ -74,7 +72,7 @@ func runCheckCommand(manifestPath string) error {
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			client.LogInfo("[CHECK] Image %s has an invalid version. Skipping ...", image)
+			log.Infof("[CHECK] Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
@@ -82,7 +80,6 @@ func runCheckCommand(manifestPath string) error {
 		if err != nil {
 			return fmt.Errorf("get tags: %w", err)
 		}
-
 		tags = filterTags(tags)
 
 		newerVersions, err := getNewerVersions(imageVersion, tags)
@@ -91,11 +88,11 @@ func runCheckCommand(manifestPath string) error {
 		}
 
 		if len(newerVersions) == 0 {
-			client.LogInfo("[CHECK] Image %s is up to date!", image)
+			log.Infof("[CHECK] Image %s is up to date!", image)
 			continue
 		}
 
-		client.LogInfo("[CHECK] New versions for %v found: %v", image, newerVersions)
+		log.Infof("[CHECK] New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil

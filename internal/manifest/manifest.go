@@ -68,6 +68,7 @@ func Get(path string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
 	}
 
+	// ..hghghggh
 	for i := range manifest.Sources {
 		if manifest.Sources[i].Target.Host == "" {
 			manifest.Sources[i].Target = manifest.Target

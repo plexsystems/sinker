@@ -15,7 +15,6 @@ func GetEncodedBasicAuth(username string, password string) (string, error) {
 		Username: username,
 		Password: password,
 	}
-
 	jsonAuth, err := json.Marshal(authConfig)
 	if err != nil {
 		return "", fmt.Errorf("marshal auth: %w", err)

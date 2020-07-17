@@ -47,17 +47,17 @@ func runListCommand(location string, manifestPath string) error {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	var listImages []string
+	var images []string
 	for _, source := range imageManifest.Sources {
 		if location == "target" {
-			listImages = append(listImages, source.TargetImage())
+			images = append(images, source.TargetImage())
 		} else {
-			listImages = append(listImages, source.Image())
+			images = append(images, source.Image())
 		}
 	}
 
 	if viper.GetString("output") == "" {
-		for _, image := range listImages {
+		for _, image := range images {
 			fmt.Println(image)
 		}
 		return nil
@@ -67,8 +67,9 @@ func runListCommand(location string, manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
+	defer f.Close()
 
-	for _, value := range listImages {
+	for _, value := range images {
 		if _, err := fmt.Fprintln(f, value); err != nil {
 			return fmt.Errorf("writing image to file: %w", err)
 		}

@@ -39,7 +39,7 @@ func newPullCommand() *cobra.Command {
 }
 
 func runPullCommand(location string, manifestPath string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	client, err := docker.NewClient(log.Infof)
@@ -54,28 +54,29 @@ func runPullCommand(location string, manifestPath string) error {
 
 	imagesToPull := make(map[string]string)
 	for _, source := range manifest.Sources {
-		var pullImage string
+		var image string
 		var auth string
+
 		var err error
 		if location == "target" {
-			pullImage = source.TargetImage()
+			image = source.TargetImage()
 			auth, err = source.Target.EncodedAuth()
 		} else {
-			pullImage = source.Image()
+			image = source.Image()
 			auth, err = source.EncodedAuth()
 		}
 		if err != nil {
 			return fmt.Errorf("get %s auth: %w", location, err)
 		}
 
-		exists, err := client.ImageExistsOnHost(ctx, pullImage)
+		exists, err := client.ImageExistsOnHost(ctx, image)
 		if err != nil {
 			return fmt.Errorf("image host existance: %w", err)
 		}
 
 		if !exists {
-			client.LogInfo("[PULL] Image %s is missing and will be pulled.", pullImage)
-			imagesToPull[pullImage] = auth
+			log.Infof("[PULL] Image %s is missing and will be pulled.", image)
+			imagesToPull[image] = auth
 		}
 	}
 
@@ -85,7 +86,7 @@ func runPullCommand(location string, manifestPath string) error {
 		}
 	}
 
-	client.LogInfo("[PULL] All images have been pulled!")
+	log.Infof("[PULL] All images have been pulled!")
 
 	return nil
 }

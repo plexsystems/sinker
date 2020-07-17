@@ -21,13 +21,13 @@ func newCreateCommand() *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
-			var path string
+			var resourcePath string
 			if len(args) > 0 {
-				path = args[0]
+				resourcePath = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runCreateCommand(path, manifestPath); err != nil {
+			if err := runCreateCommand(resourcePath, manifestPath); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
 
@@ -41,7 +41,7 @@ func newCreateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCreateCommand(path string, manifestPath string) error {
+func runCreateCommand(resourcePath string, manifestPath string) error {
 	if _, err := manifest.Get(manifestPath); err == nil {
 		return errors.New("manifest file already exists")
 	}
@@ -50,10 +50,10 @@ func runCreateCommand(path string, manifestPath string) error {
 
 	var err error
 	var imageManifest manifest.Manifest
-	if path == "" {
+	if resourcePath == "" {
 		imageManifest = manifest.New(targetPath.Host(), targetPath.Repository())
 	} else {
-		imageManifest, err = manifest.NewWithAutodetect(targetPath.Host(), targetPath.Repository(), path)
+		imageManifest, err = manifest.NewWithAutodetect(targetPath.Host(), targetPath.Repository(), resourcePath)
 		if err != nil {
 			return fmt.Errorf("new manifest with autodetect: %w", err)
 		}

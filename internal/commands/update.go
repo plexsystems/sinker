@@ -41,17 +41,18 @@ func runUpdateCommand(path string, manifestPath string) error {
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	for i := range updatedManifest.Sources {
-		for _, currentImage := range currentManifest.Sources {
-			if currentImage.Repository != updatedManifest.Sources[i].Repository || currentImage.Host != updatedManifest.Sources[i].Host {
+	for u := range updatedManifest.Sources {
+		for c := range currentManifest.Sources {
+			if currentManifest.Sources[c].Repository != updatedManifest.Sources[u].Repository {
 				continue
 			}
 
-			updatedManifest.Sources[i].Auth = currentImage.Auth
-
-			if currentManifest.Target.Host != "" || currentManifest.Target.Repository != "" {
-				updatedManifest.Target = currentImage.Target
+			if currentManifest.Sources[c].Host != updatedManifest.Sources[u].Host {
+				continue
 			}
+
+			updatedManifest.Sources[u].Auth = currentManifest.Sources[c].Auth
+			updatedManifest.Sources[u].Target = currentManifest.Sources[c].Target
 		}
 	}
 

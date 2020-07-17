@@ -38,7 +38,7 @@ func newPushCommand() *cobra.Command {
 }
 
 func runPushCommand(manifestPath string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	client, err := docker.NewClient(log.Infof)
@@ -53,7 +53,7 @@ func runPushCommand(manifestPath string) error {
 
 	log.Printf("[INFO] Finding images that need to be pushed ...")
 
-	var sourcesToPush []manifest.Source
+	var sources []manifest.Source
 	for _, source := range imageManifest.Sources {
 		exists, err := client.ImageExistsAtRemote(ctx, source.TargetImage())
 		if err != nil {
@@ -61,23 +61,23 @@ func runPushCommand(manifestPath string) error {
 		}
 
 		if !exists {
-			sourcesToPush = append(sourcesToPush, source)
+			sources = append(sources, source)
 		}
 	}
 
-	if len(sourcesToPush) == 0 {
+	if len(sources) == 0 {
 		log.Println("[INFO] All images are up to date!")
 		return nil
 	}
 
 	if viper.GetBool("dryrun") {
-		for _, source := range sourcesToPush {
+		for _, source := range sources {
 			log.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}
 
-	for _, source := range sourcesToPush {
+	for _, source := range sources {
 		auth, err := source.EncodedAuth()
 		if err != nil {
 			return fmt.Errorf("get source auth: %w", err)
@@ -88,13 +88,13 @@ func runPushCommand(manifestPath string) error {
 		}
 	}
 
-	for _, source := range sourcesToPush {
-		if err := client.DockerClient.ImageTag(ctx, source.Image(), source.TargetImage()); err != nil {
+	for _, source := range sources {
+		if err := client.Tag(ctx, source.Image(), source.TargetImage()); err != nil {
 			return fmt.Errorf("tagging image: %w", err)
 		}
 	}
 
-	for _, source := range sourcesToPush {
+	for _, source := range sources {
 		auth, err := source.Target.EncodedAuth()
 		if err != nil {
 			return fmt.Errorf("get target auth: %w", err)
@@ -105,7 +105,7 @@ func runPushCommand(manifestPath string) error {
 		}
 	}
 
-	client.LogInfo("[PUSH] All images have been pushed!")
+	log.Infof("[PUSH] All images have been pushed!")
 
 	return nil
 }

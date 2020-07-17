@@ -12,7 +12,6 @@ func (r RegistryPath) Digest() string {
 	}
 
 	digestTokens := strings.Split(string(r), "@")
-
 	return digestTokens[1]
 }
 
@@ -23,7 +22,6 @@ func (r RegistryPath) Tag() string {
 	}
 
 	tagTokens := strings.Split(string(r), ":")
-
 	return tagTokens[1]
 }
 
@@ -40,7 +38,6 @@ func (r RegistryPath) Host() string {
 	}
 
 	hostTokens := strings.Split(string(r), "/")
-
 	return hostTokens[0]
 }
 
@@ -61,6 +58,5 @@ func (r RegistryPath) Repository() string {
 	}
 
 	repository = strings.TrimLeft(repository, "/")
-
 	return repository
 }
