@@ -139,8 +139,8 @@ func (c Client) GetAllDigestsOnHost(ctx context.Context) ([]string, error) {
 	return digests, nil
 }
 
-// GetTagsForRepo returns all of the tags for a given repository.
-func (c Client) GetTagsForRepo(ctx context.Context, host string, repository string) ([]string, error) {
+// GetTagsForRepository returns all of the tags for a given repository.
+func (c Client) GetTagsForRepository(ctx context.Context, host string, repository string) ([]string, error) {
 	repoPath := "index.docker.io/" + repository
 	if host != "" {
 		repoPath = host + "/" + repository
@@ -151,7 +151,7 @@ func (c Client) GetTagsForRepo(ctx context.Context, host string, repository stri
 		return nil, fmt.Errorf("new repo: %w", err)
 	}
 
-	tags, err := remote.List(repo, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	tags, err := remote.ListWithContext(ctx, repo, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		return nil, fmt.Errorf("list: %w", err)
 	}
@@ -191,8 +191,8 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 			}
 		}
 
-		// If the error is not a transport error, some other error occured unrelated
-		// to checking if an image exists.
+		// If the error is not a transport error, some other error occured
+		// that is unrelated to checking if an image exists and it should be returned.
 		return false, fmt.Errorf("get image: %w", err)
 	}
 
@@ -224,10 +224,10 @@ func getStatusMessage(status statusLine) string {
 }
 
 func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image string, command string) error {
-	var scans int
 
 	// Read the output of the Docker client until there is nothing left to read.
 	// When there is nothing left to read, the underlying operation can be considered complete.
+	var scans int
 	for clientScanner.Scan() {
 		var status statusLine
 		if err := json.Unmarshal(clientScanner.Bytes(), &status); err != nil {
@@ -259,13 +259,12 @@ func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth stri
 	opts := types.ImagePullOptions{
 		RegistryAuth: auth,
 	}
-
 	reader, err := c.docker.ImagePull(ctx, image, opts)
 	if err != nil {
 		return fmt.Errorf("pull image: %w", err)
 	}
-	clientScanner := bufio.NewScanner(reader)
 
+	clientScanner := bufio.NewScanner(reader)
 	if err := c.waitForScannerComplete(clientScanner, image, "PULL"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
@@ -281,13 +280,12 @@ func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth stri
 	opts := types.ImagePushOptions{
 		RegistryAuth: auth,
 	}
-
 	reader, err := c.docker.ImagePush(ctx, image, opts)
 	if err != nil {
 		return fmt.Errorf("push image: %w", err)
 	}
-	clientScanner := bufio.NewScanner(reader)
 
+	clientScanner := bufio.NewScanner(reader)
 	if err := c.waitForScannerComplete(clientScanner, image, "PUSH"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}

@@ -88,19 +88,19 @@ func getYamlFiles(path string) ([]string, error) {
 func splitYamlFiles(files []string) ([][]byte, error) {
 	var yamlFiles [][]byte
 	for _, file := range files {
-		fileContent, err := ioutil.ReadFile(file)
+		fileContents, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("open file: %w", err)
 		}
 
 		var lineBreak string
-		if bytes.Contains(fileContent, []byte("\r\n")) && runtime.GOOS == "windows" {
+		if bytes.Contains(fileContents, []byte("\r\n")) && runtime.GOOS == "windows" {
 			lineBreak = "\r\n"
 		} else {
 			lineBreak = "\n"
 		}
 
-		individualYamlFiles := bytes.Split(fileContent, []byte(lineBreak+"---"+lineBreak))
+		individualYamlFiles := bytes.Split(fileContents, []byte(lineBreak+"---"+lineBreak))
 
 		yamlFiles = append(yamlFiles, individualYamlFiles...)
 	}
@@ -146,6 +146,7 @@ func getSourceHostFromRepository(repository string) string {
 		}
 	}
 
+	// An empty host refers to an image that is on Docker Hub.
 	return ""
 }
 

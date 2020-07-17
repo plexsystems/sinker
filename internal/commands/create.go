@@ -14,7 +14,7 @@ import (
 func newCreateCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "create <source>",
-		Short: "Create a new manifest",
+		Short: "Create a new a manifest",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
@@ -43,8 +43,8 @@ func newCreateCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("target", "t", "", "The target repository to sync images to (e.g. organization.com/repo)")
-	cmd.Flags().StringP("output", "o", "", "Path where the manifest file will be written to (defaults to .images.yaml in the current directory)")
+	cmd.Flags().StringP("target", "t", "", "The target repository to sync images to (e.g. host.com/repo)")
+	cmd.Flags().StringP("output", "o", "", "Path where the manifest file will be written to")
 	cmd.MarkFlagRequired("target")
 
 	return &cmd
@@ -69,7 +69,7 @@ func runCreateCommand(resourcePath string, manifestPath string) error {
 	}
 
 	if err := imageManifest.Write(manifestPath); err != nil {
-		return fmt.Errorf("writing manifest: %w", err)
+		return fmt.Errorf("write manifest: %w", err)
 	}
 
 	return nil

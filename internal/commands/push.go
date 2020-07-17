@@ -16,11 +16,11 @@ import (
 func newPushCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "push",
-		Short: "Push images in the manifest to the target repository",
+		Short: "Push the images in the manifest to the target repository",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("dryrun", cmd.Flags().Lookup("dryrun")); err != nil {
-				return fmt.Errorf("bind target flag: %w", err)
+				return fmt.Errorf("bind dryrun flag: %w", err)
 			}
 
 			manifestPath := viper.GetString("manifest")
@@ -43,7 +43,7 @@ func runPushCommand(manifestPath string) error {
 
 	client, err := docker.NewClient(log.Infof)
 	if err != nil {
-		return fmt.Errorf("new docker client: %w", err)
+		return fmt.Errorf("new client: %w", err)
 	}
 
 	imageManifest, err := manifest.Get(manifestPath)
@@ -80,7 +80,7 @@ func runPushCommand(manifestPath string) error {
 	for _, source := range sources {
 		exists, err := client.ImageExistsOnHost(ctx, source.Image())
 		if err != nil {
-			return fmt.Errorf("image host existance: %w", err)
+			return fmt.Errorf("image exists: %w", err)
 		}
 
 		if !exists {
@@ -92,7 +92,7 @@ func runPushCommand(manifestPath string) error {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
 			if err := client.Tag(ctx, source.Image(), source.TargetImage()); err != nil {
-				return fmt.Errorf("tagging image: %w", err)
+				return fmt.Errorf("tag image: %w", err)
 			}
 		}
 
@@ -101,7 +101,7 @@ func runPushCommand(manifestPath string) error {
 			return fmt.Errorf("get target auth: %w", err)
 		}
 		if err := client.PushImageAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
-			return fmt.Errorf("pushing image to target: %w", err)
+			return fmt.Errorf("push image and wait: %w", err)
 		}
 	}
 

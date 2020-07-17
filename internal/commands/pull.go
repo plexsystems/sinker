@@ -16,18 +16,22 @@ import (
 func newPullCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
-		Short:     "Pull the source or target images found in the manifest",
+		Short:     "Pull the images in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var location string
+			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
+				return fmt.Errorf("bind images flag: %w", err)
+			}
+
+			var origin string
 			if len(args) > 0 {
-				location = args[0]
+				origin = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(location, manifestPath); err != nil {
+			if err := runPullCommand(origin, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -35,10 +39,12 @@ func newPullCommand() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringSliceP("images", "i", []string{}, "List of images to pull (e.g. host.com/repo:v1.0.0)")
+
 	return &cmd
 }
 
-func runPullCommand(location string, manifestPath string) error {
+func runPullCommand(origin string, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -58,7 +64,7 @@ func runPullCommand(location string, manifestPath string) error {
 		var auth string
 
 		var err error
-		if location == "target" {
+		if origin == "target" {
 			image = source.TargetImage()
 			auth, err = source.Target.EncodedAuth()
 		} else {
@@ -66,7 +72,7 @@ func runPullCommand(location string, manifestPath string) error {
 			auth, err = source.EncodedAuth()
 		}
 		if err != nil {
-			return fmt.Errorf("get %s auth: %w", location, err)
+			return fmt.Errorf("get %s auth: %w", origin, err)
 		}
 
 		exists, err := client.ImageExistsOnHost(ctx, image)
@@ -82,7 +88,7 @@ func runPullCommand(location string, manifestPath string) error {
 
 	for image, auth := range imagesToPull {
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
-			return fmt.Errorf("pull image: %w", err)
+			return fmt.Errorf("pull image and wait: %w", err)
 		}
 	}
 

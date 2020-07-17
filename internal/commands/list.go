@@ -22,13 +22,13 @@ func newListCommand() *cobra.Command {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
-			var location string
+			var origin string
 			if len(args) > 0 {
-				location = args[0]
+				origin = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runListCommand(location, manifestPath); err != nil {
+			if err := runListCommand(origin, manifestPath); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
 
@@ -41,7 +41,7 @@ func newListCommand() *cobra.Command {
 	return &cmd
 }
 
-func runListCommand(location string, manifestPath string) error {
+func runListCommand(origin string, manifestPath string) error {
 	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
@@ -49,7 +49,7 @@ func runListCommand(location string, manifestPath string) error {
 
 	var images []string
 	for _, source := range imageManifest.Sources {
-		if location == "target" {
+		if origin == "target" {
 			images = append(images, source.TargetImage())
 		} else {
 			images = append(images, source.Image())
