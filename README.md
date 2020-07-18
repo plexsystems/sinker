@@ -64,7 +64,7 @@ mycompany.com/myteam/nginx:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818b
 
 #### Optional host defaults to Docker Hub
 
-In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub (`docker.io`).
+In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub.
 
 #### Auth
 
@@ -96,9 +96,9 @@ $ sinker push
 
 The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
 
-#### --sources and target flag (optional)
+#### --sources and --target flags (optional)
 
-A list of images to push to another repository can be specified with the `--sources` flag. Set the target with `--target`.
+A list of images can be specified with the `--sources` flag. Set the target with `--target` (required).
 
 ```shell
 $ sinker push -i busybox:latest,quay.io/coreos/prometheus-operator:v0.40.0 -t host.com/repo
