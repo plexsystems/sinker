@@ -72,7 +72,7 @@ func runCheckCommand(manifestPath string) error {
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			log.Infof("[CHECK] Image %s has an invalid version. Skipping ...", image)
+			log.Infof("Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
@@ -88,11 +88,11 @@ func runCheckCommand(manifestPath string) error {
 		}
 
 		if len(newerVersions) == 0 {
-			log.Infof("[CHECK] Image %s is up to date!", image)
+			log.Infof("Image %s is up to date!", image)
 			continue
 		}
 
-		log.Infof("[CHECK] New versions for %v found: %v", image, newerVersions)
+		log.Infof("New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil

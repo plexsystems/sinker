@@ -25,7 +25,7 @@ type Client struct {
 
 // NewClient returns a Docker client configured with the given information logger.
 func NewClient(logInfo func(format string, args ...interface{})) (Client, error) {
-	retry.DefaultDelay = 10 * time.Second
+	retry.DefaultDelay = 5 * time.Second
 	retry.DefaultAttempts = 2
 
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -53,7 +53,7 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 	}
 
 	retryFunc := func(attempts uint, err error) {
-		c.logInfo("[RETRY] Unable to push %v (Retrying #%v)", image, attempts+1)
+		c.logInfo("Unable to push %v (Retrying #%v)", image, attempts+1)
 	}
 
 	if err := retry.Do(push, retry.OnRetry(retryFunc)); err != nil {
@@ -75,7 +75,7 @@ func (c Client) PullImageAndWait(ctx context.Context, image string, auth string)
 	}
 
 	retryFunc := func(attempts uint, err error) {
-		c.logInfo("[RETRY] Unable to pull %v (Retrying #%v)", image, attempts+1)
+		c.logInfo("Unable to pull %v (Retrying #%v)", image, attempts+1)
 	}
 
 	if err := retry.Do(pull, retry.OnRetry(retryFunc)); err != nil {
@@ -211,18 +211,6 @@ type statusLine struct {
 	ErrorMessage   string         `json:"error"`
 }
 
-func getStatusMessage(status statusLine) string {
-	if strings.Contains(status.Message, "Pulling from") || strings.Contains(status.Message, "The push refers to") {
-		return "Started"
-	}
-
-	if status.ProgressDetail.Total > 0 {
-		return fmt.Sprintf("Processing %vB of %vB", status.ProgressDetail.Current, status.ProgressDetail.Total)
-	}
-
-	return "Processing"
-}
-
 func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image string, command string) error {
 
 	// Read the output of the Docker client until there is nothing left to read.
@@ -239,8 +227,9 @@ func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image strin
 		}
 
 		// Serves as makeshift polling to occasionally print the status of the Docker command.
-		if scans%25 == 0 {
-			c.logInfo("[%s] %s (%s)", command, image, getStatusMessage(status))
+		if scans%25 == 0 && status.ProgressDetail.Total > 0 {
+			progress := fmt.Sprintf("Processing %vB of %vB", status.ProgressDetail.Current, status.ProgressDetail.Total)
+			c.logInfo("%sing %s (%s)", command, image, progress)
 		}
 
 		scans++
@@ -249,8 +238,6 @@ func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image strin
 	if clientScanner.Err() != nil {
 		return fmt.Errorf("scanner: %w", clientScanner.Err())
 	}
-
-	c.logInfo("[%s] %s complete.", command, image)
 
 	return nil
 }
@@ -265,7 +252,7 @@ func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth stri
 	}
 
 	clientScanner := bufio.NewScanner(reader)
-	if err := c.waitForScannerComplete(clientScanner, image, "PULL"); err != nil {
+	if err := c.waitForScannerComplete(clientScanner, image, "Pull"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
 
@@ -286,7 +273,7 @@ func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth stri
 	}
 
 	clientScanner := bufio.NewScanner(reader)
-	if err := c.waitForScannerComplete(clientScanner, image, "PUSH"); err != nil {
+	if err := c.waitForScannerComplete(clientScanner, image, "Push"); err != nil {
 		return fmt.Errorf("wait for scanner: %w", err)
 	}
 

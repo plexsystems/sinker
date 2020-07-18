@@ -188,7 +188,7 @@ func TestSource_AuthFromEnvironment(t *testing.T) {
 		Auth:   auth,
 	}
 
-	expectedAuthJSON := []byte(`{"username":"ENV_USER_VALUE","password":"ENV_PASS_VALUE"}`)
+	expectedAuthJSON := []byte(`{"Username":"ENV_USER_VALUE","Password":"ENV_PASS_VALUE"}`)
 	expectedAuth := base64.URLEncoding.EncodeToString(expectedAuthJSON)
 
 	os.Setenv("ENV_USER_KEY", "ENV_USER_VALUE")
