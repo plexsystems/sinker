@@ -19,8 +19,6 @@ Releases are also provided in the [releases](https://github.com/plexsystems/sink
 
 ## The image manifest
 
-While the `create` and `update` commands assist with managing the image manifest, the `push` command will not modify the image manifest. Allowing you to manually control the manifest if desired.
-
 ### The target section
 
 ```yaml
@@ -70,7 +68,7 @@ In both the `target` and `sources` section, the `host` field is _optional_. When
 
 All auth is handled by looking at the clients Docker auth. If the client can perform a `docker push` or `docker pull`, sinker will be able to as well.
 
-In the event that an image that needs to be sync'd is in another registry, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This is useful in CI pipelines.
+Optionally, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This could be useful in pipelines where auth is stored in environment variables.
 
 ## Usage
 
@@ -96,9 +94,9 @@ $ sinker push
 
 The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
 
-#### --sources and --target flags (optional)
+#### --images and --target flags (optional)
 
-A list of images can be specified with the `--sources` flag. Set the target with `--target` (required).
+A list of images can be specified with the `--images` flag. Set the target with `--target` (required).
 
 ```shell
 $ sinker push -i busybox:latest,quay.io/coreos/prometheus-operator:v0.40.0 -t host.com/repo
