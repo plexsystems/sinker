@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// A Manifest contains all of the sources to push to a target registry.
+// Manifest contains all of the sources to push to a target registry.
 type Manifest struct {
 	Target  Target   `yaml:"target"`
 	Sources []Source `yaml:"sources,omitempty"`

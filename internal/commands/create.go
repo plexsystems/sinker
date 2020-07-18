@@ -44,8 +44,9 @@ func newCreateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("target", "t", "", "The target repository to sync images to (e.g. host.com/repo)")
-	cmd.Flags().StringP("output", "o", "", "Path where the manifest file will be written to")
 	cmd.MarkFlagRequired("target")
+
+	cmd.Flags().StringP("output", "o", "", "Path where the manifest file will be written to")
 
 	return &cmd
 }

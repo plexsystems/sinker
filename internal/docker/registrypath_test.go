@@ -21,7 +21,7 @@ func TestRegistryPath_Empty(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Host(t *testing.T) {
@@ -35,7 +35,7 @@ func TestRegistryPath_Host(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Host_WithSlash(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRegistryPath_Host_WithSlash(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Repository_NoHost(t *testing.T) {
@@ -63,7 +63,7 @@ func TestRegistryPath_Repository_NoHost(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Repository_RepeatedName(t *testing.T) {
@@ -77,7 +77,7 @@ func TestRegistryPath_Repository_RepeatedName(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Repository_OneLevel(t *testing.T) {
@@ -91,7 +91,7 @@ func TestRegistryPath_Repository_OneLevel(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Repository_MultipleLevels(t *testing.T) {
@@ -105,7 +105,7 @@ func TestRegistryPath_Repository_MultipleLevels(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Tag(t *testing.T) {
@@ -119,7 +119,7 @@ func TestRegistryPath_Tag(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Tag_None(t *testing.T) {
@@ -133,7 +133,7 @@ func TestRegistryPath_Tag_None(t *testing.T) {
 		expectedDigest:     "",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
 func TestRegistryPath_Digest(t *testing.T) {
@@ -147,10 +147,10 @@ func TestRegistryPath_Digest(t *testing.T) {
 		expectedDigest:     "sha256:abc123",
 	}
 
-	verifyRegistryPathMethods(t, test)
+	verifyRegistryPath(t, test)
 }
 
-func verifyRegistryPathMethods(t *testing.T, test registryPathTest) {
+func verifyRegistryPath(t *testing.T, test registryPathTest) {
 	if test.actualPath.Host() != test.expectedHost {
 		t.Errorf("expected host to be %s, actual %s", test.expectedHost, test.actualPath.Host())
 	}

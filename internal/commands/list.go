@@ -14,7 +14,7 @@ func newListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "list <source|target>",
 		Short:     "List the images found in the manifest",
-		Args:      cobra.OnlyValidArgs,
+		Args:      cobra.ExactValidArgs(1),
 		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -22,11 +22,7 @@ func newListCommand() *cobra.Command {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
-			var origin string
-			if len(args) > 0 {
-				origin = args[0]
-			}
-
+			origin := args[0]
 			manifestPath := viper.GetString("manifest")
 			if err := runListCommand(origin, manifestPath); err != nil {
 				return fmt.Errorf("list: %w", err)

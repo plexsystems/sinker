@@ -17,7 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
-// A Client manages the communication with the Docker client.
+// Client manages the communication with the Docker client.
 type Client struct {
 	docker  *client.Client
 	logInfo func(format string, args ...interface{})
@@ -159,7 +159,7 @@ func (c Client) GetTagsForRepository(ctx context.Context, host string, repositor
 	return tags, nil
 }
 
-// Tag creates a new tag from the given target image that references the source image
+// Tag creates a new tag from the given target image that references the source image.
 func (c Client) Tag(ctx context.Context, sourceImage string, targetImage string) error {
 	if err := c.docker.ImageTag(ctx, sourceImage, targetImage); err != nil {
 		return fmt.Errorf("tag image: %w", err)
