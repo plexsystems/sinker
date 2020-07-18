@@ -98,7 +98,7 @@ The `--dryrun` flag will print out a summary of the images that do not exist at 
 
 #### --sources and target flag (optional)
 
-A list of images to push to another repository can be specified with the `--sources` flag. Set the target with `--target`.
+A list of images can be specified with the `--sources` flag. Set the target with `--target`.
 
 ```shell
 $ sinker push -i busybox:latest,quay.io/coreos/prometheus-operator:v0.40.0 -t host.com/repo
