@@ -71,7 +71,7 @@ func runPushCommand(manifestPath string) error {
 		sources = imageManifest.Sources
 	}
 
-	log.Printf("[INFO] Finding images that need to be pushed ...")
+	log.Infof("Finding images that need to be pushed ...")
 
 	var sourcesToPush []manifest.Source
 	for _, source := range sources {
@@ -86,13 +86,13 @@ func runPushCommand(manifestPath string) error {
 	}
 
 	if len(sourcesToPush) == 0 {
-		log.Println("[INFO] All images are up to date!")
+		log.Infof("All images are up to date!")
 		return nil
 	}
 
 	if viper.GetBool("dryrun") {
 		for _, source := range sourcesToPush {
-			log.Printf("[INFO] Image %s would be pushed as %s", source.Image(), source.TargetImage())
+			log.Infof("Image %s would be pushed as %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}
@@ -108,9 +108,13 @@ func runPushCommand(manifestPath string) error {
 			if err != nil {
 				return fmt.Errorf("get source auth: %w", err)
 			}
+
+			log.Infof("Pulling %s", source.Image())
 			if err := client.PullImageAndWait(ctx, source.Image(), sourceAuth); err != nil {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
+			log.Infof("Pulled %s", source.Image())
+
 			if err := client.Tag(ctx, source.Image(), source.TargetImage()); err != nil {
 				return fmt.Errorf("tag image: %w", err)
 			}
@@ -120,12 +124,15 @@ func runPushCommand(manifestPath string) error {
 		if err != nil {
 			return fmt.Errorf("get target auth: %w", err)
 		}
+
+		log.Infof("Pushing %s", source.TargetImage())
 		if err := client.PushImageAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
 			return fmt.Errorf("push image and wait: %w", err)
 		}
+		log.Infof("Pushed %s", source.TargetImage())
 	}
 
-	log.Infof("[PUSH] All images have been pushed!")
+	log.Infof("All images have been pushed!")
 
 	return nil
 }

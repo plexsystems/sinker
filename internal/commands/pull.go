@@ -63,6 +63,8 @@ func runPullCommand(origin string, manifestPath string) error {
 		return fmt.Errorf("get images: %w", err)
 	}
 
+	log.Infof("Finding images that need to be pulled ...")
+
 	imagesToPull := make(map[string]string)
 	for image, auth := range images {
 		exists, err := client.ImageExistsOnHost(ctx, image)
@@ -71,18 +73,19 @@ func runPullCommand(origin string, manifestPath string) error {
 		}
 
 		if !exists {
-			log.Infof("[PULL] Image %s is missing and will be pulled.", image)
 			imagesToPull[image] = auth
 		}
 	}
 
 	for image, auth := range imagesToPull {
+		log.Infof("Pulling %s", image)
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
 			return fmt.Errorf("pull image and wait: %w", err)
 		}
+		log.Infof("Pulled %s", image)
 	}
 
-	log.Infof("[PULL] All images have been pulled!")
+	log.Infof("All images have been pulled!")
 
 	return nil
 }

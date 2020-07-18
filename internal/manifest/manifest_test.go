@@ -1,6 +1,10 @@
 package manifest
 
-import "testing"
+import (
+	"encoding/base64"
+	"os"
+	"testing"
+)
 
 func TestSource_WithoutRepository(t *testing.T) {
 	source := Source{
@@ -168,5 +172,41 @@ func TestSource_Digest(t *testing.T) {
 	const expectedTarget = "target.com/repo:123"
 	if source.TargetImage() != expectedTarget {
 		t.Errorf("unexpected target string. expected %s, actual %s", source.TargetImage(), expectedTarget)
+	}
+}
+
+func TestSource_AuthFromEnvironment(t *testing.T) {
+	auth := Auth{
+		Username: "ENV_USER_KEY",
+		Password: "ENV_PASS_KEY",
+	}
+	target := Target{
+		Auth: auth,
+	}
+	source := Source{
+		Target: target,
+		Auth:   auth,
+	}
+
+	expectedAuthJSON := []byte(`{"Username":"ENV_USER_VALUE","Password":"ENV_PASS_VALUE"}`)
+	expectedAuth := base64.URLEncoding.EncodeToString(expectedAuthJSON)
+
+	os.Setenv("ENV_USER_KEY", "ENV_USER_VALUE")
+	os.Setenv("ENV_PASS_KEY", "ENV_PASS_VALUE")
+
+	actualSourceAuth, err := source.EncodedAuth()
+	if err != nil {
+		t.Fatal("encoded source auth:", err)
+	}
+	if actualSourceAuth != expectedAuth {
+		t.Errorf("expected source auth %s, actual %s", expectedAuth, actualSourceAuth)
+	}
+
+	actualTargetAuth, err := source.Target.EncodedAuth()
+	if err != nil {
+		t.Fatal("encoded target auth:", err)
+	}
+	if actualTargetAuth != expectedAuth {
+		t.Errorf("expected target auth %s, actual %s", expectedAuth, actualTargetAuth)
 	}
 }

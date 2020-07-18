@@ -1,6 +1,8 @@
 package manifest
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -109,7 +111,7 @@ type Target struct {
 // EncodedAuth returns the Base64 encoded auth for the target registry.
 func (t Target) EncodedAuth() (string, error) {
 	if t.Auth.Password != "" {
-		auth, err := docker.GetEncodedBasicAuth(t.Auth.Username, t.Auth.Password)
+		auth, err := getEncodedBasicAuth(os.Getenv(t.Auth.Username), os.Getenv(t.Auth.Password))
 		if err != nil {
 			return "", fmt.Errorf("get encoded auth: %w", err)
 		}
@@ -187,7 +189,7 @@ func (s Source) TargetImage() string {
 // EncodedAuth returns the Base64 encoded auth for the source registry.
 func (s Source) EncodedAuth() (string, error) {
 	if s.Auth.Password != "" {
-		auth, err := docker.GetEncodedBasicAuth(s.Auth.Username, s.Auth.Password)
+		auth, err := getEncodedBasicAuth(os.Getenv(s.Auth.Username), os.Getenv(s.Auth.Password))
 		if err != nil {
 			return "", fmt.Errorf("get encoded auth: %w", err)
 		}
@@ -238,4 +240,17 @@ func getManifestLocation(path string) string {
 	}
 
 	return location
+}
+
+func getEncodedBasicAuth(username string, password string) (string, error) {
+	authConfig := Auth{
+		Username: username,
+		Password: password,
+	}
+	jsonAuth, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", fmt.Errorf("marshal auth: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(jsonAuth), nil
 }
