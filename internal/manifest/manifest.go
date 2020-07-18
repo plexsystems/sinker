@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -22,20 +21,20 @@ type Manifest struct {
 // New returns an empty Manifest with the target set to the
 // specified host and repository.
 func New(host string, repository string) Manifest {
-	manifestTarget := Target{
+	target := Target{
 		Host:       host,
 		Repository: repository,
 	}
 
 	manifest := Manifest{
-		Target: manifestTarget,
+		Target: target,
 	}
 
 	return manifest
 }
 
-// NewWithAutodetect returns a Manifest populated with the images found in the specified path.
-// The target of the Manifest will be set to the specified host and repository.
+// NewWithAutodetect returns a manifest populated with the images found at the specified path.
+// The target of the manifest will be set to the specified host and repository.
 func NewWithAutodetect(host string, repository string, path string) (Manifest, error) {
 	manifest := New(host, repository)
 
@@ -44,18 +43,17 @@ func NewWithAutodetect(host string, repository string, path string) (Manifest, e
 		Repository: repository,
 	}
 
-	foundImages, err := GetImagesFromKubernetesManifests(path, target)
+	images, err := GetImagesFromKubernetesManifests(path, target)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
 	}
 
-	manifest.Sources = foundImages
+	manifest.Sources = images
 
 	return manifest, nil
 }
 
-// Get returns the Manifest found at the specified path.
-// An error is returned when a Manifest cannot be found.
+// Get returns the manifest found at the specified path.
 func Get(path string) (Manifest, error) {
 	manifestLocation := getManifestLocation(path)
 	manifestContents, err := ioutil.ReadFile(manifestLocation)
@@ -65,25 +63,26 @@ func Get(path string) (Manifest, error) {
 
 	var manifest Manifest
 	if err := yaml.Unmarshal(manifestContents, &manifest); err != nil {
-		return Manifest{}, fmt.Errorf("unmarshal current manifest: %w", err)
+		return Manifest{}, fmt.Errorf("unmarshal manifest: %w", err)
 	}
 
-	for i := range manifest.Sources {
-		if manifest.Sources[i].Target.Host == "" {
-			manifest.Sources[i].Target = manifest.Target
+	// When a source in the manifest does not define its own target the default target
+	// should be the target defined in the manifest.
+	for s := range manifest.Sources {
+		if manifest.Sources[s].Target.Host == "" {
+			manifest.Sources[s].Target = manifest.Target
 		}
 	}
 
 	return manifest, nil
 }
 
-// Write writes the contents of the manifest file to the specified path.
+// Write writes the contents of the manifest to disk at the specified path.
 func (m Manifest) Write(path string) error {
 	imageManifestContents, err := yaml.Marshal(&m)
 	if err != nil {
 		return fmt.Errorf("marshal image manifest: %w", err)
 	}
-	imageManifestContents = bytes.ReplaceAll(imageManifestContents, []byte(`"`), []byte(""))
 
 	manifestLocation := getManifestLocation(path)
 	if err := ioutil.WriteFile(manifestLocation, imageManifestContents, os.ModePerm); err != nil {
@@ -204,15 +203,39 @@ func (s Source) EncodedAuth() (string, error) {
 	return auth, nil
 }
 
+// GetSourcesFromImages returns the given images as sources with the specified target.
+func GetSourcesFromImages(images []string, target string) []Source {
+	targetRegistryPath := docker.RegistryPath(target)
+	sourceTarget := Target{
+		Host:       targetRegistryPath.Host(),
+		Repository: targetRegistryPath.Repository(),
+	}
+
+	var sources []Source
+	for _, image := range images {
+		registryPath := docker.RegistryPath(image)
+
+		source := Source{
+			Host:       registryPath.Host(),
+			Target:     sourceTarget,
+			Repository: registryPath.Repository(),
+			Tag:        registryPath.Tag(),
+			Digest:     registryPath.Digest(),
+		}
+
+		sources = append(sources, source)
+	}
+
+	return sources
+}
+
 func getManifestLocation(path string) string {
 	const defaultManifestFileName = ".images.yaml"
 
-	var manifestLocation string
-	if strings.Contains(path, ".yaml") || strings.Contains(path, ".yml") {
-		manifestLocation = path
-	} else {
-		manifestLocation = filepath.Join(path, defaultManifestFileName)
+	location := path
+	if !strings.Contains(location, ".yaml") && !strings.Contains(location, ".yml") {
+		location = filepath.Join(path, defaultManifestFileName)
 	}
 
-	return manifestLocation
+	return location
 }

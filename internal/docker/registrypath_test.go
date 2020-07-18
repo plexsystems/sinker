@@ -10,9 +10,8 @@ type registryPathTest struct {
 	expectedDigest     string
 }
 
-func TestPath_Empty(t *testing.T) {
-	const expected = ""
-	path := RegistryPath(expected)
+func TestRegistryPath_Empty(t *testing.T) {
+	path := RegistryPath("")
 
 	test := registryPathTest{
 		actualPath:         path,

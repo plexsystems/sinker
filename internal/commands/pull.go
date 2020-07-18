@@ -16,18 +16,22 @@ import (
 func newPullCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:       "pull <source|target>",
-		Short:     "Pull the source or target images found in the image manifest",
+		Short:     "Pull the images in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var location string
+			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
+				return fmt.Errorf("bind images flag: %w", err)
+			}
+
+			var origin string
 			if len(args) > 0 {
-				location = args[0]
+				origin = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(location, manifestPath); err != nil {
+			if err := runPullCommand(origin, manifestPath); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -35,11 +39,13 @@ func newPullCommand() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringSliceP("images", "i", []string{}, "List of images to pull (e.g. host.com/repo:v1.0.0)")
+
 	return &cmd
 }
 
-func runPullCommand(location string, manifestPath string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+func runPullCommand(origin string, manifestPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	client, err := docker.NewClient(log.Infof)
@@ -47,45 +53,81 @@ func runPullCommand(location string, manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	manifest, err := manifest.Get(manifestPath)
+	var images map[string]string
+	if len(viper.GetStringSlice("images")) > 0 {
+		images, err = getImagesFromCommandLine(viper.GetStringSlice("images"))
+	} else {
+		images, err = getImagesFromManifest(manifestPath, origin)
+	}
 	if err != nil {
-		return fmt.Errorf("get manifest: %w", err)
+		return fmt.Errorf("get images: %w", err)
 	}
 
 	imagesToPull := make(map[string]string)
-	for _, source := range manifest.Sources {
-		var pullImage string
-		var auth string
-		var err error
-		if location == "target" {
-			pullImage = source.TargetImage()
-			auth, err = source.Target.EncodedAuth()
-		} else {
-			pullImage = source.Image()
-			auth, err = source.EncodedAuth()
-		}
-		if err != nil {
-			return fmt.Errorf("get %s auth: %w", location, err)
-		}
-
-		exists, err := client.ImageExistsOnHost(ctx, pullImage)
+	for image, auth := range images {
+		exists, err := client.ImageExistsOnHost(ctx, image)
 		if err != nil {
 			return fmt.Errorf("image host existance: %w", err)
 		}
 
 		if !exists {
-			client.LogInfo("[PULL] Image %s is missing and will be pulled.", pullImage)
-			imagesToPull[pullImage] = auth
+			log.Infof("[PULL] Image %s is missing and will be pulled.", image)
+			imagesToPull[image] = auth
 		}
 	}
 
 	for image, auth := range imagesToPull {
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
-			return fmt.Errorf("pull image: %w", err)
+			return fmt.Errorf("pull image and wait: %w", err)
 		}
 	}
 
-	client.LogInfo("[PULL] All images have been pulled!")
+	log.Infof("[PULL] All images have been pulled!")
 
 	return nil
+}
+
+func getImagesFromManifest(path string, origin string) (map[string]string, error) {
+	imageManifest, err := manifest.Get(path)
+	if err != nil {
+		return nil, fmt.Errorf("get manifest: %w", err)
+	}
+
+	images := make(map[string]string)
+	for _, source := range imageManifest.Sources {
+		var image string
+		var auth string
+
+		var err error
+		if origin == "target" {
+			image = source.TargetImage()
+			auth, err = source.Target.EncodedAuth()
+		} else {
+			image = source.Image()
+			auth, err = source.EncodedAuth()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("get %s auth: %w", origin, err)
+		}
+
+		images[image] = auth
+	}
+
+	return images, nil
+}
+
+func getImagesFromCommandLine(images []string) (map[string]string, error) {
+	imgs := make(map[string]string)
+	for _, image := range images {
+		registryPath := docker.RegistryPath(image)
+
+		auth, err := docker.GetEncodedAuthForHost(registryPath.Host())
+		if err != nil {
+			return nil, fmt.Errorf("get auth: %w", err)
+		}
+
+		imgs[image] = auth
+	}
+
+	return imgs, nil
 }

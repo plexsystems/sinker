@@ -7,6 +7,8 @@
 
 `sinker` syncs container images from one registry to another. This is useful in cases when you rely on images that exist in a public container registry, but need to pull from a private registry.
 
+Images can be sync'd either by using [The image manifest](#the-image-manifest) or via the command line.
+
 See the [example](https://github.com/plexsystems/sinker/tree/main/example) folder for more details on the produced files.
 
 ## Installation
@@ -94,6 +96,14 @@ $ sinker push
 
 The `--dryrun` flag will print out a summary of the images that do not exist at the target registry and the fully qualified names of the images that will be pushed.
 
+#### --sources and target flag (optional)
+
+A list of images to push to another repository can be specified with the `--sources` flag. Set the target with `--target`.
+
+```shell
+$ sinker push -i busybox:latest,quay.io/coreos/prometheus-operator:v0.40.0 -t host.com/repo
+```
+
 ### Pull command
 
 Pulls the source or target images found in the image manifest.
@@ -105,6 +115,10 @@ Pulling the `target` could be useful if you need to load the images into another
 ```shell
 $ sinker pull <source|target>
 ```
+
+#### --images flag (optional)
+
+A list of images to pull, delimeted by commas.
 
 ### List command
 
@@ -128,11 +142,7 @@ $ sinker check
 
 #### --images flag (optional)
 
-A list of images to check updates for delimeted by commas, e.g.
-
-```shell
-$ sinker check --images jimmidyson/configmap-reload:v0.3.0,quay.io/coreos/prometheus-config-reloader:v0.39.0
-```
+A list of images to check updates for, delimeted by commas.
 
 ### Create command
 
@@ -145,6 +155,14 @@ $ sinker create <file|directory> --target mycompany.com/myteam
 #### --target flag (required)
 
 Specifies the target registry (and optionally a repository) to sync the images to.
+
+#### --output flag (optional)
+
+Outputs the updated manifest to the specified path.
+
+- If a directory is specified, the manifest will be created in the directory with the name `.images.yaml`.
+
+- If a path is a yaml file, the manifest will be created at the given path.
 
 #### Passing in a directory or file (optional)
 
@@ -180,5 +198,13 @@ Updates the current image manifest to reflect new changes found in the Kubernete
 ```shell
 $ sinker update <file|directory>
 ```
+
+#### --output flag (optional)
+
+Outputs the updated manifest to the specified path.
+
+- If a directory is specified, the manifest will be created in the directory with the name `.images.yaml`.
+
+- If a path is a yaml file, the manifest will be created at the given path.
 
 _NOTE: The update command will ONLY update image **versions**. This allows for pinning of certain fields you want to manage yourself (source registry, auth)._

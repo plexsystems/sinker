@@ -22,13 +22,13 @@ func newListCommand() *cobra.Command {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
-			var location string
+			var origin string
 			if len(args) > 0 {
-				location = args[0]
+				origin = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
-			if err := runListCommand(location, manifestPath); err != nil {
+			if err := runListCommand(origin, manifestPath); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
 
@@ -41,23 +41,23 @@ func newListCommand() *cobra.Command {
 	return &cmd
 }
 
-func runListCommand(location string, manifestPath string) error {
+func runListCommand(origin string, manifestPath string) error {
 	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
 	}
 
-	var listImages []string
+	var images []string
 	for _, source := range imageManifest.Sources {
-		if location == "target" {
-			listImages = append(listImages, source.TargetImage())
+		if origin == "target" {
+			images = append(images, source.TargetImage())
 		} else {
-			listImages = append(listImages, source.Image())
+			images = append(images, source.Image())
 		}
 	}
 
 	if viper.GetString("output") == "" {
-		for _, image := range listImages {
+		for _, image := range images {
 			fmt.Println(image)
 		}
 		return nil
@@ -67,8 +67,9 @@ func runListCommand(location string, manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
+	defer f.Close()
 
-	for _, value := range listImages {
+	for _, value := range images {
 		if _, err := fmt.Fprintln(f, value); err != nil {
 			return fmt.Errorf("writing image to file: %w", err)
 		}

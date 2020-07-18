@@ -18,7 +18,7 @@ import (
 func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
-		Short: "Check for newer images in the source registry",
+		Short: "Check for newer images",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
@@ -34,7 +34,7 @@ func newCheckCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringSliceP("images", "i", []string{}, "The fully qualified images to check if newer versions exist (e.g. myhost.com/myrepo:v1.0.0)")
+	cmd.Flags().StringSliceP("images", "i", []string{}, "List of images to check (e.g. host.com/repo:v1.0.0)")
 
 	return &cmd
 }
@@ -48,16 +48,14 @@ func runCheckCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	var imagesToCheck []string
-	if len(viper.GetStringSlice("images")) > 0 {
-		imagesToCheck = viper.GetStringSlice("images")
-	} else {
-		manifest, err := manifest.Get(manifestPath)
+	imagesToCheck := viper.GetStringSlice("images")
+	if len(imagesToCheck) == 0 {
+		imageManifest, err := manifest.Get(manifestPath)
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}
 
-		for _, source := range manifest.Sources {
+		for _, source := range imageManifest.Sources {
 			imagesToCheck = append(imagesToCheck, source.Image())
 		}
 	}
@@ -74,28 +72,27 @@ func runCheckCommand(manifestPath string) error {
 
 		imageVersion, err := version.NewVersion(image.Tag())
 		if err != nil {
-			client.LogInfo("[CHECK] Image %s has an invalid version. Skipping ...", image)
+			log.Infof("[CHECK] Image %s has an invalid version. Skipping ...", image)
 			continue
 		}
 
-		tags, err := client.GetTagsForRepo(ctx, image.Host(), image.Repository())
+		tags, err := client.GetTagsForRepository(ctx, image.Host(), image.Repository())
 		if err != nil {
 			return fmt.Errorf("get tags: %w", err)
 		}
-
 		tags = filterTags(tags)
 
 		newerVersions, err := getNewerVersions(imageVersion, tags)
 		if err != nil {
-			return fmt.Errorf("getting newer version: %w", err)
+			return fmt.Errorf("get newer versions: %w", err)
 		}
 
 		if len(newerVersions) == 0 {
-			client.LogInfo("[CHECK] Image %s is up to date!", image)
+			log.Infof("[CHECK] Image %s is up to date!", image)
 			continue
 		}
 
-		client.LogInfo("[CHECK] New versions for %v found: %v", image, newerVersions)
+		log.Infof("[CHECK] New versions for %v found: %v", image, newerVersions)
 	}
 
 	return nil
@@ -124,8 +121,6 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 	return newerVersions, nil
 }
 
-// filterTags filters out tags that would not be desirable to update to.
-// This includes malformed tags and pre-releases.
 func filterTags(tags []string) []string {
 	var filteredTags []string
 	for _, tag := range tags {
@@ -138,7 +133,7 @@ func filterTags(tags []string) []string {
 			continue
 		}
 
-		// This will remove tags that include architectures and other strings
+		// Remove tags that include architectures and other strings
 		// not necessarily related to a release.
 		allowedPreReleases := []string{"alpha", "beta", "rc"}
 		if strings.Contains(tag, "-") && !containsSubstring(allowedPreReleases, tag) {

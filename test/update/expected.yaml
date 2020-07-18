@@ -1,0 +1,13 @@
+target:
+  host: myhost.com
+sources:
+- repository: some/image
+  tag: v2.0.0
+  auth:
+    username: MY_USER
+    password: MY_PASS
+- repository: some/repo
+  target:
+    host: MY_HOST
+    repository: MY_REPO
+  digest: sha256:abc123

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-update
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: test-update
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: test-update
+    spec:
+      containers:
+      - args:
+        - --test-digest=some/repo@sha256:abc123
+        image: some/image:v2.0.0
+        name: test-update

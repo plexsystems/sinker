@@ -149,17 +149,16 @@ func TestSource_WithNestedRepository(t *testing.T) {
 }
 
 func TestSource_Digest(t *testing.T) {
-	source := Source{
-		Host:       "source.com",
-		Repository: "repo",
-		Digest:     "sha256:123",
-	}
-
 	target := Target{
 		Host: "target.com",
 	}
 
-	source.Target = target
+	source := Source{
+		Host:       "source.com",
+		Target:     target,
+		Repository: "repo",
+		Digest:     "sha256:123",
+	}
 
 	const expectedSource = "source.com/repo@sha256:123"
 	if source.Image() != expectedSource {
