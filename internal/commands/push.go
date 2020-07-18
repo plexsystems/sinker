@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,6 +32,10 @@ func newPushCommand() *cobra.Command {
 				return fmt.Errorf("bind target flag: %w", err)
 			}
 
+			if len(viper.GetStringSlice("images")) > 0 && viper.GetString("target") == "" {
+				return errors.New("target must be specified when using the images flag")
+			}
+
 			manifestPath := viper.GetString("manifest")
 			if err := runPushCommand(manifestPath); err != nil {
 				return fmt.Errorf("push: %w", err)
@@ -56,11 +61,9 @@ func runPushCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	var sources []manifest.Source
-	if len(viper.GetStringSlice("images")) > 0 {
-		sources = manifest.GetSourcesFromImages(viper.GetStringSlice("images"), viper.GetString("target"))
-	} else {
-		imageManifest, err := manifest.Get(manifestPath)
+	sources := manifest.GetSourcesFromImages(viper.GetStringSlice("images"), viper.GetString("target"))
+	if len(sources) == 0 {
+		imageManifest, err := manifest.Get(viper.GetString("manifest"))
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}

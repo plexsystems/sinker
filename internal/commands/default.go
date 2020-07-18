@@ -20,6 +20,9 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.PersistentFlags().StringP("manifest", "m", "", "Path where the manifest file is (defaults to .images.yaml in the current directory)")
 	viper.BindPFlag("manifest", cmd.PersistentFlags().Lookup("manifest"))
 
+	viper.SetEnvPrefix("SINKER")
+	viper.AutomaticEnv()
+
 	cmd.AddCommand(newCreateCommand())
 	cmd.AddCommand(newUpdateCommand())
 	cmd.AddCommand(newListCommand())
