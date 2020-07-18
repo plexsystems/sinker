@@ -9,21 +9,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
-// GetEncodedBasicAuth encodes a username and password into Base64.
-func GetEncodedBasicAuth(username string, password string) (string, error) {
-	authConfig := authn.AuthConfig{
-		Username: username,
-		Password: password,
-	}
-	jsonAuth, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("marshal auth: %w", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(jsonAuth), nil
-
-}
-
 // GetEncodedAuthForHost returns a Base64 encoded auth for the given host.
 func GetEncodedAuthForHost(host string) (string, error) {
 	registryReference, err := name.NewRegistry(host, name.WeakValidation)
