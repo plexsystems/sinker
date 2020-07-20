@@ -14,7 +14,7 @@ func NewDefaultCommand() *cobra.Command {
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
 		Long:    "A tool to sync container images to another container registry",
-		Version: "0.10.1",
+		Version: "0.10.2",
 	}
 
 	cmd.PersistentFlags().StringP("manifest", "m", "", "Path where the manifest file is (defaults to .images.yaml in the current directory)")
