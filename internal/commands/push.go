@@ -98,33 +98,39 @@ func runPushCommand(manifestPath string) error {
 	}
 
 	for _, source := range sourcesToPush {
-		exists, err := client.ImageExistsOnHost(ctx, source.Image())
+		sourceExists, err := client.ImageExistsOnHost(ctx, source.Image())
 		if err != nil {
 			return fmt.Errorf("image exists: %w", err)
 		}
 
-		if !exists {
+		if !sourceExists {
+			log.Infof("Pulling %s", source.Image())
+
 			sourceAuth, err := source.EncodedAuth()
 			if err != nil {
 				return fmt.Errorf("get source auth: %w", err)
 			}
-
-			log.Infof("Pulling %s", source.Image())
 			if err := client.PullImageAndWait(ctx, source.Image(), sourceAuth); err != nil {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
+		}
 
+		targetExists, err := client.ImageExistsOnHost(ctx, source.TargetImage())
+		if err != nil {
+			return fmt.Errorf("target exists: %w", err)
+		}
+		if !targetExists {
 			if err := client.Tag(ctx, source.Image(), source.TargetImage()); err != nil {
 				return fmt.Errorf("tag image: %w", err)
 			}
 		}
 
+		log.Infof("Pushing %s", source.TargetImage())
+
 		targetAuth, err := source.Target.EncodedAuth()
 		if err != nil {
 			return fmt.Errorf("get target auth: %w", err)
 		}
-
-		log.Infof("Pushing %s", source.TargetImage())
 		if err := client.PushImageAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
 			return fmt.Errorf("push image and wait: %w", err)
 		}
