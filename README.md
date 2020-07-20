@@ -74,7 +74,7 @@ Optionally, the `auth` section allows you to set the names of _environment varia
 
 Descriptions of commands and flags to help understand how to use Sinker.
 
-![demo](assets/sinker-demo.gif)
+![demo](assets/sinker-pull-demo.gif)
 
 ### Global flags
 

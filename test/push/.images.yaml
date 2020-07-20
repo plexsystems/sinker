@@ -2,6 +2,5 @@ target:
   repository: plexsystems
 sources:
 - repository: busybox
-  host: docker.io
   tag: latest
   

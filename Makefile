@@ -2,6 +2,10 @@
 build:
 	go build
 
+.PHONY: remove-images
+remove-images:
+	docker rmi `docker images -a -q`
+
 .PHONY: test
 test:
 	go test -v ./... -count=1

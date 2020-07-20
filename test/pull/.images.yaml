@@ -1,0 +1,7 @@
+target:
+  repository: plexsystems
+sources:
+- repository: sinker-test
+  tag: latest
+- repository: sinker-test
+  tag: 1.0.0
