@@ -113,7 +113,6 @@ func runPushCommand(manifestPath string) error {
 			if err := client.PullImageAndWait(ctx, source.Image(), sourceAuth); err != nil {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
-			log.Infof("Pulled %s", source.Image())
 
 			if err := client.Tag(ctx, source.Image(), source.TargetImage()); err != nil {
 				return fmt.Errorf("tag image: %w", err)
@@ -129,7 +128,6 @@ func runPushCommand(manifestPath string) error {
 		if err := client.PushImageAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
 			return fmt.Errorf("push image and wait: %w", err)
 		}
-		log.Infof("Pushed %s", source.TargetImage())
 	}
 
 	log.Infof("All images have been pushed!")

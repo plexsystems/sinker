@@ -82,7 +82,6 @@ func runPullCommand(origin string, manifestPath string) error {
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
 			return fmt.Errorf("pull image and wait: %w", err)
 		}
-		log.Infof("Pulled %s", image)
 	}
 
 	log.Infof("All images have been pulled!")
