@@ -166,12 +166,12 @@ func TestSource_Digest(t *testing.T) {
 
 	const expectedSource = "source.com/repo@sha256:123"
 	if source.Image() != expectedSource {
-		t.Errorf("unexpected source string. expected %s, actual %s", source.Image(), expectedSource)
+		t.Errorf("unexpected source %s, actual %s", expectedSource, source.Image())
 	}
 
 	const expectedTarget = "target.com/repo:123"
 	if source.TargetImage() != expectedTarget {
-		t.Errorf("unexpected target string. expected %s, actual %s", source.TargetImage(), expectedTarget)
+		t.Errorf("unexpected target %s, actual %s", expectedTarget, source.TargetImage())
 	}
 }
 
@@ -208,5 +208,24 @@ func TestSource_AuthFromEnvironment(t *testing.T) {
 	}
 	if actualTargetAuth != expectedAuth {
 		t.Errorf("expected target auth %s, actual %s", expectedAuth, actualTargetAuth)
+	}
+}
+
+func TestSource_TargetDockerHub(t *testing.T) {
+	target := Target{
+		Host:       "",
+		Repository: "targetrepo",
+	}
+
+	source := Source{
+		Host:       "source.com",
+		Target:     target,
+		Repository: "nested/sourcerepo",
+		Tag:        "v1.0.0",
+	}
+
+	const expectedTarget = "targetrepo/sourcerepo:v1.0.0"
+	if source.TargetImage() != expectedTarget {
+		t.Errorf("unexpected target string. expected %s, actual %s", expectedTarget, source.TargetImage())
 	}
 }
