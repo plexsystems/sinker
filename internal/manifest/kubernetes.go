@@ -19,7 +19,7 @@ import (
 
 // GetImagesFromKubernetesManifests returns all images found in Kubernetes manifests
 // that are located at the specified path.
-func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, error) {
+func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -40,19 +40,7 @@ func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, err
 		imageList = append(imageList, images...)
 	}
 
-	var dedupedImageList []string
-	for _, image := range imageList {
-		if !contains(dedupedImageList, image) {
-			dedupedImageList = append(dedupedImageList, image)
-		}
-	}
-
-	marshalledImages, err := marshalImages(dedupedImageList, target)
-	if err != nil {
-		return nil, fmt.Errorf("marshal images: %w", err)
-	}
-
-	return marshalledImages, nil
+	return imageList, nil
 }
 
 func getYamlFiles(path string) ([]string, error) {
@@ -106,48 +94,6 @@ func splitYamlFiles(files []string) ([][]byte, error) {
 	}
 
 	return yamlFiles, nil
-}
-
-func marshalImages(images []string, target Target) ([]Source, error) {
-	var containerImages []Source
-	for _, image := range images {
-		path := docker.RegistryPath(image)
-
-		sourceHost := getSourceHostFromRepository(path.Repository())
-
-		sourceRepository := path.Repository()
-		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
-		sourceRepository = strings.TrimLeft(sourceRepository, "/")
-
-		source := Source{
-			Host:       sourceHost,
-			Repository: sourceRepository,
-			Tag:        path.Tag(),
-			Digest:     path.Digest(),
-		}
-
-		containerImages = append(containerImages, source)
-	}
-
-	return containerImages, nil
-}
-
-func getSourceHostFromRepository(repository string) string {
-	repositoryMappings := map[string]string{
-		"kubernetes-ingress-controller": "quay.io",
-		"coreos":                        "quay.io",
-		"open-policy-agent":             "quay.io",
-		"twistlock":                     "registry.twistlock.com",
-	}
-
-	for repositorySegment, host := range repositoryMappings {
-		if strings.Contains(repository, repositorySegment) {
-			return host
-		}
-	}
-
-	// An empty host refers to an image that is on Docker Hub.
-	return ""
 }
 
 func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
@@ -249,8 +195,15 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				continue
 			}
 
-			argTokens := strings.Split(arg, "=")
-			images = append(images, argTokens[1])
+			image := strings.Split(arg, "=")[1]
+
+			registryPath := docker.RegistryPath(image)
+
+			if strings.Contains(registryPath.Repository(), ":") {
+				continue
+			}
+
+			images = append(images, image)
 		}
 	}
 

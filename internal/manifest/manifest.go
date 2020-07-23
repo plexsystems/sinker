@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bufio"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -18,41 +19,6 @@ import (
 type Manifest struct {
 	Target  Target   `yaml:"target"`
 	Sources []Source `yaml:"sources,omitempty"`
-}
-
-// New returns an empty Manifest with the target set to the
-// specified host and repository.
-func New(host string, repository string) Manifest {
-	target := Target{
-		Host:       host,
-		Repository: repository,
-	}
-
-	manifest := Manifest{
-		Target: target,
-	}
-
-	return manifest
-}
-
-// NewWithAutodetect returns a manifest populated with the images found at the specified path.
-// The target of the manifest will be set to the specified host and repository.
-func NewWithAutodetect(host string, repository string, path string) (Manifest, error) {
-	manifest := New(host, repository)
-
-	target := Target{
-		Host:       host,
-		Repository: repository,
-	}
-
-	images, err := GetImagesFromKubernetesManifests(path, target)
-	if err != nil {
-		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
-	}
-
-	manifest.Sources = images
-
-	return manifest, nil
 }
 
 // Get returns the manifest found at the specified path.
@@ -233,6 +199,94 @@ func GetSourcesFromImages(images []string, target string) []Source {
 	}
 
 	return sources
+}
+
+// GetImagesFromStandardIn gets a list of images passed in by standard input.
+func GetImagesFromStandardIn() ([]string, error) {
+	standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
+	contents, err := ioutil.ReadAll(standardInReader)
+	if err != nil {
+		return nil, fmt.Errorf("read config: %w", err)
+	}
+
+	images := strings.Split(string(contents), " ")
+	return images, nil
+}
+
+// GetSourcesFromTarget gets a list of sources using images with a registry path already at the target.
+// This is useful when you need to do a reverse look-up of the images to see where they were originally sourced from.
+//
+// For example, a list with a single image, myhost.com/myrepo/coreos/prometheus-operator would return a Source of:
+// Host: quay.io
+// Repository: coreos/prometheus-operator
+func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
+	var originals []string
+	for _, image := range images {
+		if !contains(originals, image) {
+			originals = append(originals, image)
+		}
+	}
+
+	var containerImages []Source
+	for _, image := range originals {
+		path := docker.RegistryPath(image)
+
+		// When the source host and the target host are the same, this means that the
+		// images that were retrieved are target images.
+		//
+		// In order to populate the source hosts  in the image manifest, we need to
+		// figure out what the source host of the image is.
+		//
+		// When the source host and target host are different, we can safely use the
+		// host found in the image definition.
+		var sourceHost string
+		if path.Host() == target.Host {
+			sourceHost = getSourceHostFromRepository(path.Repository())
+		} else {
+			sourceHost = path.Host()
+		}
+
+		sourceRepository := path.Repository()
+		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
+		sourceRepository = strings.TrimLeft(sourceRepository, "/")
+
+		source := Source{
+			Host:       sourceHost,
+			Repository: sourceRepository,
+			Tag:        path.Tag(),
+			Digest:     path.Digest(),
+		}
+
+		containerImages = append(containerImages, source)
+	}
+
+	return containerImages, nil
+}
+
+func getSourceHostFromRepository(repository string) string {
+	repositoryMappings := map[string]string{
+		"kubernetes-ingress-controller": "quay.io",
+		"coreos":                        "quay.io",
+		"open-policy-agent":             "quay.io",
+
+		"twistlock": "registry.twistlock.com",
+
+		"etcd":                    "k8s.gcr.io",
+		"kube-apiserver":          "k8s.gcr.io",
+		"coredns":                 "k8s.gcr.io",
+		"kube-proxy":              "k8s.gcr.io",
+		"kube-scheduler":          "k8s.gcr.io",
+		"kube-controller-manager": "k8s.gcr.io",
+	}
+
+	for repositorySegment, host := range repositoryMappings {
+		if strings.Contains(repository, repositorySegment) {
+			return host
+		}
+	}
+
+	// An empty host refers to an image that is on Docker Hub.
+	return ""
 }
 
 func getManifestLocation(path string) string {
