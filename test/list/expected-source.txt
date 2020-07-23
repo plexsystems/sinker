@@ -1,0 +1,2 @@
+host.com/nested/sinker-test:v1.0.0
+host.com/sinker-test:v2.0.0
