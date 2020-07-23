@@ -48,27 +48,33 @@ sources:
   digest: sha256:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818bba84cd22c29
 ```
 
-The images section includes the host of the registry and the repository where the image is located. For example, the `prometheus-operator` would be pushed to:
+### Optional host defaults to Docker Hub
+
+In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub.
+
+### Auth
+
+All auth is handled by looking at the clients Docker auth. If the client can perform a `docker push` or `docker pull`, sinker will be able to as well.
+
+Optionally, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This could be useful in pipelines where auth is stored in environment variables.
+
+## Sync behavior
+
+If the `target` registry supports nested paths, the entire source repository will be pushed to the target. For example, the `prometheus-operator` would be pushed to:
 
 ```text
 mycompany.com/myteam/coreos/prometheus-operator:v0.40.0
 ```
 
-When using `digests`, the image will be pushed with a tag matching the SHA of the digest:
+**Registries that support nested paths:** Azure Container Registry (ACR), Amazon Elastic Container Registry (ECR)
+
+If the `target` registry does _not_ support nested paths, only the base path of the source will be pushed to the target registry. For example, the `prometheus-operator` would be pushed to:
 
 ```text
-mycompany.com/myteam/nginx:bbda10abb0b7dc57cfaab5d70ae55bd5aedfa3271686bace9818bba84cd22c29
+mycompany.com/myteam/prometheus-operator:v0.40.0
 ```
 
-#### Optional host defaults to Docker Hub
-
-In both the `target` and `sources` section, the `host` field is _optional_. When no host is set, the host is assumed to be Docker Hub.
-
-#### Auth
-
-All auth is handled by looking at the clients Docker auth. If the client can perform a `docker push` or `docker pull`, sinker will be able to as well.
-
-Optionally, the `auth` section allows you to set the names of _environment variables_ that will be used for creating basic auth to the registry. This could be useful in pipelines where auth is stored in environment variables.
+**Registries that do not support nested paths:** Docker Hub, Google Container Registry (GCR)
 
 ## Usage
 
