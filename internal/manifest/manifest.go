@@ -266,6 +266,11 @@ func hostSupportsNestedRepositories(host string) bool {
 		return false
 	}
 
+	// Quay.io
+	if strings.Contains(host, "quay.io") {
+		return false
+	}
+
 	// Docker Registry (Docker Hub)
 	// An empty host is assumed to be Docker Hub.
 	if strings.Contains(host, "docker.io") || host == "" {
