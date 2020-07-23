@@ -19,7 +19,7 @@ import (
 
 // GetImagesFromKubernetesManifests returns all images found in Kubernetes manifests
 // that are located at the specified path.
-func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, error) {
+func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 	files, err := getYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
@@ -40,12 +40,7 @@ func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, err
 		imageList = append(imageList, images...)
 	}
 
-	marshalledImages, err := GetSourcesFromTarget(imageList, target)
-	if err != nil {
-		return nil, fmt.Errorf("marshal images: %w", err)
-	}
-
-	return marshalledImages, nil
+	return imageList, nil
 }
 
 func getYamlFiles(path string) ([]string, error) {
@@ -78,42 +73,24 @@ func getYamlFiles(path string) ([]string, error) {
 	return files, nil
 }
 
-func yamlContainsSeparator(yaml []byte) bool {
-	var lineBreak string
-	if bytes.Contains(yaml, []byte("\r\n")) && runtime.GOOS == "windows" {
-		lineBreak = "\r\n"
-	} else {
-		lineBreak = "\n"
-	}
-
-	separator := []byte(lineBreak + "---" + lineBreak)
-	return bytes.Contains(yaml, separator)
-}
-
-func splitYamlFileBySeparator(yaml []byte) [][]byte {
-	var lineBreak string
-	if bytes.Contains(yaml, []byte("\r\n")) && runtime.GOOS == "windows" {
-		lineBreak = "\r\n"
-	} else {
-		lineBreak = "\n"
-	}
-
-	yamlFiles := bytes.Split(yaml, []byte(lineBreak+"---"+lineBreak))
-	return yamlFiles
-}
-
 func splitYamlFiles(files []string) ([][]byte, error) {
 	var yamlFiles [][]byte
 	for _, file := range files {
-		yamlContents, err := ioutil.ReadFile(file)
+		fileContents, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("open file: %w", err)
 		}
 
-		if yamlContainsSeparator(yamlContents) {
-			yamlFiles = append(yamlFiles, splitYamlFileBySeparator(yamlContents)...)
-			continue
+		var lineBreak string
+		if bytes.Contains(fileContents, []byte("\r\n")) && runtime.GOOS == "windows" {
+			lineBreak = "\r\n"
+		} else {
+			lineBreak = "\n"
 		}
+
+		individualYamlFiles := bytes.Split(fileContents, []byte(lineBreak+"---"+lineBreak))
+
+		yamlFiles = append(yamlFiles, individualYamlFiles...)
 	}
 
 	return yamlFiles, nil

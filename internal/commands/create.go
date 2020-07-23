@@ -25,9 +25,9 @@ func newCreateCommand() *cobra.Command {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
-			var resourcePath string
+			var path string
 			if len(args) > 0 {
-				resourcePath = args[0]
+				path = args[0]
 			}
 
 			manifestPath := viper.GetString("manifest")
@@ -35,7 +35,7 @@ func newCreateCommand() *cobra.Command {
 				manifestPath = viper.GetString("output")
 			}
 
-			if err := runCreateCommand(resourcePath, manifestPath); err != nil {
+			if err := runCreateCommand(path, manifestPath); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
 
@@ -51,25 +51,39 @@ func newCreateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCreateCommand(resourcePath string, manifestPath string) error {
+func runCreateCommand(path string, manifestPath string) error {
 	if _, err := manifest.Get(manifestPath); err == nil {
 		return errors.New("manifest file already exists")
 	}
 
 	targetPath := docker.RegistryPath(viper.GetString("target"))
-
-	var err error
-	var imageManifest manifest.Manifest
-	if resourcePath == "" {
-		imageManifest = manifest.New(targetPath.Host(), targetPath.Repository())
-	} else {
-		imageManifest, err = manifest.NewWithAutodetect(targetPath.Host(), targetPath.Repository(), resourcePath)
-		if err != nil {
-			return fmt.Errorf("new manifest with autodetect: %w", err)
-		}
+	target := manifest.Target{
+		Host:       targetPath.Host(),
+		Repository: targetPath.Repository(),
 	}
 
-	if err := imageManifest.Write(manifestPath); err != nil {
+	var images []string
+	var err error
+	if path == "-" {
+		images, err = manifest.GetImagesFromStandardIn()
+	} else if path != "" {
+		images, err = manifest.GetImagesFromKubernetesManifests(path)
+	}
+	if err != nil {
+		return fmt.Errorf("get images: %w", err)
+	}
+
+	sources, err := manifest.GetSourcesFromTarget(images, target)
+	if err != nil {
+		return fmt.Errorf("get sources: %w", err)
+	}
+
+	manifest := manifest.Manifest{
+		Target:  target,
+		Sources: sources,
+	}
+
+	if err := manifest.Write(manifestPath); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 

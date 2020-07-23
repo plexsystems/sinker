@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bufio"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -18,41 +19,6 @@ import (
 type Manifest struct {
 	Target  Target   `yaml:"target"`
 	Sources []Source `yaml:"sources,omitempty"`
-}
-
-// New returns an empty Manifest with the target set to the
-// specified host and repository.
-func New(host string, repository string) Manifest {
-	target := Target{
-		Host:       host,
-		Repository: repository,
-	}
-
-	manifest := Manifest{
-		Target: target,
-	}
-
-	return manifest
-}
-
-// NewWithAutodetect returns a manifest populated with the images found at the specified path.
-// The target of the manifest will be set to the specified host and repository.
-func NewWithAutodetect(host string, repository string, path string) (Manifest, error) {
-	manifest := New(host, repository)
-
-	target := Target{
-		Host:       host,
-		Repository: repository,
-	}
-
-	images, err := GetImagesFromKubernetesManifests(path, target)
-	if err != nil {
-		return Manifest{}, fmt.Errorf("get from kubernetes manifests: %w", err)
-	}
-
-	manifest.Sources = images
-
-	return manifest, nil
 }
 
 // Get returns the manifest found at the specified path.
@@ -235,6 +201,24 @@ func GetSourcesFromImages(images []string, target string) []Source {
 	return sources
 }
 
+// GetImagesFromStandardIn gets a list of images passed in by standard input.
+func GetImagesFromStandardIn() ([]string, error) {
+	standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
+	contents, err := ioutil.ReadAll(standardInReader)
+	if err != nil {
+		return nil, fmt.Errorf("read config: %w", err)
+	}
+
+	images := strings.Split(string(contents), " ")
+	return images, nil
+}
+
+// GetSourcesFromTarget gets a list of sources using images with a registry path already at the target.
+// This is useful when you need to do a reverse look-up of the images to see where they were originally sourced from.
+//
+// For example, a list with a single image, myhost.com/myrepo/coreos/prometheus-operator would return a Source of:
+// Host: quay.io
+// Repository: coreos/prometheus-operator
 func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
 	var originals []string
 	for _, image := range images {
@@ -284,7 +268,15 @@ func getSourceHostFromRepository(repository string) string {
 		"kubernetes-ingress-controller": "quay.io",
 		"coreos":                        "quay.io",
 		"open-policy-agent":             "quay.io",
-		"twistlock":                     "registry.twistlock.com",
+
+		"twistlock": "registry.twistlock.com",
+
+		"etcd":                    "k8s.gcr.io",
+		"kube-apiserver":          "k8s.gcr.io",
+		"coredns":                 "k8s.gcr.io",
+		"kube-proxy":              "k8s.gcr.io",
+		"kube-scheduler":          "k8s.gcr.io",
+		"kube-controller-manager": "k8s.gcr.io",
 	}
 
 	for repositorySegment, host := range repositoryMappings {

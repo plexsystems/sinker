@@ -1,11 +1,7 @@
 package commands
 
 import (
-	"bufio"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
 
 	"github.com/plexsystems/sinker/internal/manifest"
 
@@ -50,25 +46,19 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	var sources []manifest.Source
+	var images []string
 	if path == "-" {
-		standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
-		contents, err := ioutil.ReadAll(standardInReader)
-		if err != nil {
-			return fmt.Errorf("read config: %w", err)
-		}
-
-		imageList := strings.Split(string(contents), " ")
-		sources, err = manifest.GetSourcesFromTarget(imageList, currentManifest.Target)
-		if err != nil {
-			return fmt.Errorf("marshal images: %w", err)
-		}
+		images, err = manifest.GetImagesFromStandardIn()
 	} else {
-		imageManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
-		if err != nil {
-			return fmt.Errorf("get new manifest: %w", err)
-		}
-		sources = imageManifest.Sources
+		images, err = manifest.GetImagesFromKubernetesManifests(path)
+	}
+	if err != nil {
+		return fmt.Errorf("get images: %w", err)
+	}
+
+	sources, err := manifest.GetSourcesFromTarget(images, currentManifest.Target)
+	if err != nil {
+		return fmt.Errorf("get sources: %w", err)
 	}
 
 	for s := range sources {
