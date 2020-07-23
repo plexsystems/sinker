@@ -1,7 +1,11 @@
 package commands
 
 import (
+	"bufio"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 
 	"github.com/plexsystems/sinker/internal/manifest"
 
@@ -46,18 +50,34 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	imageManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
-	if err != nil {
-		return fmt.Errorf("get new manifest: %w", err)
+	var sources []manifest.Source
+	if path == "-" {
+		standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
+		contents, err := ioutil.ReadAll(standardInReader)
+		if err != nil {
+			return fmt.Errorf("read config: %w", err)
+		}
+
+		imageList := strings.Split(string(contents), " ")
+		sources, err = manifest.GetSourcesFromTarget(imageList, currentManifest.Target)
+		if err != nil {
+			return fmt.Errorf("marshal images: %w", err)
+		}
+	} else {
+		imageManifest, err := manifest.NewWithAutodetect(currentManifest.Target.Host, currentManifest.Target.Repository, path)
+		if err != nil {
+			return fmt.Errorf("get new manifest: %w", err)
+		}
+		sources = imageManifest.Sources
 	}
 
-	for s := range imageManifest.Sources {
+	for s := range sources {
 		for _, currentSource := range currentManifest.Sources {
-			if currentSource.Host != imageManifest.Sources[s].Host {
+			if currentSource.Host != sources[s].Host {
 				continue
 			}
 
-			if currentSource.Repository != imageManifest.Sources[s].Repository {
+			if currentSource.Repository != sources[s].Repository {
 				continue
 			}
 
@@ -67,17 +87,21 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 			// To preserve the current settings, set the manifest host and repository values
 			// to the ones present in the current manifest.
 			if currentSource.Target.Host != currentManifest.Target.Host {
-				imageManifest.Sources[s].Target.Host = currentSource.Target.Host
+				sources[s].Target.Host = currentSource.Target.Host
 			}
 			if currentSource.Target.Repository != currentManifest.Target.Repository {
-				imageManifest.Sources[s].Target.Repository = currentSource.Target.Repository
+				sources[s].Target.Repository = currentSource.Target.Repository
 			}
 
-			imageManifest.Sources[s].Auth = currentSource.Auth
+			sources[s].Auth = currentSource.Auth
 		}
 	}
 
-	if err := imageManifest.Write(outputPath); err != nil {
+	updatedManifest := manifest.Manifest{
+		Target:  currentManifest.Target,
+		Sources: sources,
+	}
+	if err := updatedManifest.Write(outputPath); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 

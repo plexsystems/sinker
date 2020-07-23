@@ -40,14 +40,7 @@ func GetImagesFromKubernetesManifests(path string, target Target) ([]Source, err
 		imageList = append(imageList, images...)
 	}
 
-	var dedupedImageList []string
-	for _, image := range imageList {
-		if !contains(dedupedImageList, image) {
-			dedupedImageList = append(dedupedImageList, image)
-		}
-	}
-
-	marshalledImages, err := marshalImages(dedupedImageList, target)
+	marshalledImages, err := GetSourcesFromTarget(imageList, target)
 	if err != nil {
 		return nil, fmt.Errorf("marshal images: %w", err)
 	}
@@ -85,69 +78,45 @@ func getYamlFiles(path string) ([]string, error) {
 	return files, nil
 }
 
+func yamlContainsSeparator(yaml []byte) bool {
+	var lineBreak string
+	if bytes.Contains(yaml, []byte("\r\n")) && runtime.GOOS == "windows" {
+		lineBreak = "\r\n"
+	} else {
+		lineBreak = "\n"
+	}
+
+	separator := []byte(lineBreak + "---" + lineBreak)
+	return bytes.Contains(yaml, separator)
+}
+
+func splitYamlFileBySeparator(yaml []byte) [][]byte {
+	var lineBreak string
+	if bytes.Contains(yaml, []byte("\r\n")) && runtime.GOOS == "windows" {
+		lineBreak = "\r\n"
+	} else {
+		lineBreak = "\n"
+	}
+
+	yamlFiles := bytes.Split(yaml, []byte(lineBreak+"---"+lineBreak))
+	return yamlFiles
+}
+
 func splitYamlFiles(files []string) ([][]byte, error) {
 	var yamlFiles [][]byte
 	for _, file := range files {
-		fileContents, err := ioutil.ReadFile(file)
+		yamlContents, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("open file: %w", err)
 		}
 
-		var lineBreak string
-		if bytes.Contains(fileContents, []byte("\r\n")) && runtime.GOOS == "windows" {
-			lineBreak = "\r\n"
-		} else {
-			lineBreak = "\n"
+		if yamlContainsSeparator(yamlContents) {
+			yamlFiles = append(yamlFiles, splitYamlFileBySeparator(yamlContents)...)
+			continue
 		}
-
-		individualYamlFiles := bytes.Split(fileContents, []byte(lineBreak+"---"+lineBreak))
-
-		yamlFiles = append(yamlFiles, individualYamlFiles...)
 	}
 
 	return yamlFiles, nil
-}
-
-func marshalImages(images []string, target Target) ([]Source, error) {
-	var containerImages []Source
-	for _, image := range images {
-		path := docker.RegistryPath(image)
-
-		sourceHost := getSourceHostFromRepository(path.Repository())
-
-		sourceRepository := path.Repository()
-		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
-		sourceRepository = strings.TrimLeft(sourceRepository, "/")
-
-		source := Source{
-			Host:       sourceHost,
-			Repository: sourceRepository,
-			Tag:        path.Tag(),
-			Digest:     path.Digest(),
-		}
-
-		containerImages = append(containerImages, source)
-	}
-
-	return containerImages, nil
-}
-
-func getSourceHostFromRepository(repository string) string {
-	repositoryMappings := map[string]string{
-		"kubernetes-ingress-controller": "quay.io",
-		"coreos":                        "quay.io",
-		"open-policy-agent":             "quay.io",
-		"twistlock":                     "registry.twistlock.com",
-	}
-
-	for repositorySegment, host := range repositoryMappings {
-		if strings.Contains(repository, repositorySegment) {
-			return host
-		}
-	}
-
-	// An empty host refers to an image that is on Docker Hub.
-	return ""
 }
 
 func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
@@ -249,8 +218,15 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				continue
 			}
 
-			argTokens := strings.Split(arg, "=")
-			images = append(images, argTokens[1])
+			image := strings.Split(arg, "=")[1]
+
+			registryPath := docker.RegistryPath(image)
+
+			if strings.Contains(registryPath.Repository(), ":") {
+				continue
+			}
+
+			images = append(images, image)
 		}
 	}
 

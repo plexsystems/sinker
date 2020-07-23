@@ -61,8 +61,10 @@ func runPushCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	sources := manifest.GetSourcesFromImages(viper.GetStringSlice("images"), viper.GetString("target"))
-	if len(sources) == 0 {
+	var sources []manifest.Source
+	if len(viper.GetStringSlice("images")) > 0 {
+		sources = manifest.GetSourcesFromImages(viper.GetStringSlice("images"), viper.GetString("target"))
+	} else {
 		imageManifest, err := manifest.Get(viper.GetString("manifest"))
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)

@@ -235,6 +235,68 @@ func GetSourcesFromImages(images []string, target string) []Source {
 	return sources
 }
 
+func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
+	var originals []string
+	for _, image := range images {
+		if !contains(originals, image) {
+			originals = append(originals, image)
+		}
+	}
+
+	var containerImages []Source
+	for _, image := range originals {
+		path := docker.RegistryPath(image)
+
+		// When the source host and the target host are the same, this means that the
+		// images that were retrieved are target images.
+		//
+		// In order to populate the source hosts  in the image manifest, we need to
+		// figure out what the source host of the image is.
+		//
+		// When the source host and target host are different, we can safely use the
+		// host found in the image definition.
+		var sourceHost string
+		if path.Host() == target.Host {
+			sourceHost = getSourceHostFromRepository(path.Repository())
+		} else {
+			sourceHost = path.Host()
+		}
+
+		sourceRepository := path.Repository()
+		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
+		sourceRepository = strings.TrimLeft(sourceRepository, "/")
+
+		source := Source{
+			Host:       sourceHost,
+			Repository: sourceRepository,
+			Tag:        path.Tag(),
+			Digest:     path.Digest(),
+		}
+
+		containerImages = append(containerImages, source)
+	}
+
+	return containerImages, nil
+}
+
+func getSourceHostFromRepository(repository string) string {
+	repositoryMappings := map[string]string{
+		"kubernetes-ingress-controller": "quay.io",
+		"coreos":                        "quay.io",
+		"open-policy-agent":             "quay.io",
+		"twistlock":                     "registry.twistlock.com",
+	}
+
+	for repositorySegment, host := range repositoryMappings {
+		if strings.Contains(repository, repositorySegment) {
+			return host
+		}
+	}
+
+	// An empty host refers to an image that is on Docker Hub.
+	return ""
+}
+
 func getManifestLocation(path string) string {
 	const defaultManifestFileName = ".images.yaml"
 
