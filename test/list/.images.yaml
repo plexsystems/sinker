@@ -1,0 +1,9 @@
+target:
+  repository: plexsystems
+sources:
+- repository: nested/sinker-test
+  host: host.com
+  tag: v1.0.0
+- repository: sinker-test
+  host: host.com
+  tag: v2.0.0

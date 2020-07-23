@@ -170,7 +170,11 @@ func (s Source) TargetImage() string {
 	}
 
 	if s.Repository != "" {
-		target = "/" + s.Repository + target
+		if hostSupportsNestedRepositories(s.Target.Host) {
+			target = "/" + s.Repository + target
+		} else {
+			target = "/" + filepath.Base(s.Repository) + target
+		}
 	}
 
 	if s.Target.Repository != "" {
@@ -253,4 +257,20 @@ func getEncodedBasicAuth(username string, password string) (string, error) {
 	}
 
 	return base64.URLEncoding.EncodeToString(jsonAuth), nil
+}
+
+func hostSupportsNestedRepositories(host string) bool {
+
+	// Google Container Registry (GCR)
+	if strings.Contains(host, "gcr.io") {
+		return false
+	}
+
+	// Docker Registry (Docker Hub)
+	// An empty host is assumed to be Docker Hub.
+	if strings.Contains(host, "docker.io") || host == "" {
+		return false
+	}
+
+	return true
 }

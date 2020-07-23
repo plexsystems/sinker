@@ -211,7 +211,7 @@ func TestSource_AuthFromEnvironment(t *testing.T) {
 	}
 }
 
-func TestSource_TargetDockerHub(t *testing.T) {
+func TestSource_TargetDoesNotSupportNestedRepositories_SinglePath(t *testing.T) {
 	target := Target{
 		Host:       "",
 		Repository: "targetrepo",
@@ -221,6 +221,25 @@ func TestSource_TargetDockerHub(t *testing.T) {
 		Host:       "source.com",
 		Target:     target,
 		Repository: "nested/sourcerepo",
+		Tag:        "v1.0.0",
+	}
+
+	const expectedTarget = "targetrepo/sourcerepo:v1.0.0"
+	if source.TargetImage() != expectedTarget {
+		t.Errorf("unexpected target string. expected %s, actual %s", expectedTarget, source.TargetImage())
+	}
+}
+
+func TestSource_TargetDoesNotSupportNestedRepositories_MultiplePaths(t *testing.T) {
+	target := Target{
+		Host:       "",
+		Repository: "targetrepo",
+	}
+
+	source := Source{
+		Host:       "source.com",
+		Target:     target,
+		Repository: "really/nested/sourcerepo",
 		Tag:        "v1.0.0",
 	}
 

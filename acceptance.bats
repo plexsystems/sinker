@@ -36,6 +36,16 @@
   git diff --quiet -- example/target.txt
 }
 
+@test "[LIST] List of source images matches expected output when target repository does not support nested repos" {
+  run ./sinker list source --manifest test/list --output test/list/expected-source.txt
+  git diff --quiet -- test/list/expected-source.txt
+}
+
+@test "[LIST] List of target images matches expected output when target repository does not support nested repos" {
+  run ./sinker list target --manifest test/list --output test/list/expected-target.txt
+  git diff --quiet -- test/list/expected-target.txt
+}
+
 @test "[PUSH] Using --dryrun flag lists missing images" {
   run ./sinker push --dryrun --manifest test/push
   [[ "$output" =~ "Image busybox:latest would be pushed as plexsystems/busybox:latest" ]]
