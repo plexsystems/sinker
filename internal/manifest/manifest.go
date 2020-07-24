@@ -75,6 +75,10 @@ func (m Manifest) Update(images []string) Manifest {
 		//
 		// In the event the source cannot be found in the manifest, we must rely on
 		// trying to find the source registry from the repository the image is sourced from.
+		//
+		// This is more of a nice-to-have. The worst case is that we get it wrong and the
+		// user has to update the host value to the correct one. Once defined in the manifest
+		// we can continue to use the host that was set.
 		foundSource, exists := m.findSourceInManifest(updatedImage)
 		if !exists {
 			updatedSource.Host = getSourceHostFromRepository(updatedRegistryPath.Repository())
