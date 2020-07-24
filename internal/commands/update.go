@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
 
 	"github.com/spf13/cobra"
@@ -46,54 +47,73 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 		return fmt.Errorf("get current manifest: %w", err)
 	}
 
-	var images []string
+	var updatedImages []string
 	if path == "-" {
-		images, err = manifest.GetImagesFromStandardIn()
+		updatedImages, err = manifest.GetImagesFromStandardInput()
 	} else {
-		images, err = manifest.GetImagesFromKubernetesManifests(path)
+		updatedImages, err = manifest.GetImagesFromKubernetesManifests(path)
 	}
 	if err != nil {
 		return fmt.Errorf("get images: %w", err)
 	}
 
-	sources, err := manifest.GetSourcesFromTarget(images, currentManifest.Target)
-	if err != nil {
-		return fmt.Errorf("get sources: %w", err)
-	}
+	var updatedSources []manifest.Source
+	for _, updatedImage := range updatedImages {
+		updatedRegistryPath := docker.RegistryPath(updatedImage)
 
-	for s := range sources {
-		for _, currentSource := range currentManifest.Sources {
-			if currentSource.Host != sources[s].Host {
-				continue
-			}
-
-			if currentSource.Repository != sources[s].Repository {
-				continue
-			}
-
-			// If the target host (or repository) of the source does not match the manifest
-			// target host (or repository), it has been modified by the user.
-			//
-			// To preserve the current settings, set the manifest host and repository values
-			// to the ones present in the current manifest.
-			if currentSource.Target.Host != currentManifest.Target.Host {
-				sources[s].Target.Host = currentSource.Target.Host
-			}
-			if currentSource.Target.Repository != currentManifest.Target.Repository {
-				sources[s].Target.Repository = currentSource.Target.Repository
-			}
-
-			sources[s].Auth = currentSource.Auth
+		updatedSource := manifest.Source{
+			Tag:    updatedRegistryPath.Tag(),
+			Digest: updatedRegistryPath.Digest(),
 		}
+
+		foundSource, exists := findSourceInManifest(currentManifest, updatedImage)
+		if !exists {
+			updatedSource.Host = manifest.GetSourceHostFromRepository(updatedRegistryPath.Repository())
+			updatedSource.Repository = updatedRegistryPath.Repository()
+			updatedSources = append(updatedSources, updatedSource)
+			fmt.Println(updatedImage + "was not found.")
+			continue
+		}
+
+		if foundSource.Target.Host != currentManifest.Target.Host {
+			updatedSource.Target.Host = foundSource.Target.Host
+		}
+		if foundSource.Target.Repository != currentManifest.Target.Repository {
+			updatedSource.Target.Repository = foundSource.Target.Repository
+		}
+
+		updatedSource.Repository = foundSource.Repository
+		updatedSource.Host = foundSource.Host
+		updatedSource.Auth = foundSource.Auth
+
+		updatedSources = append(updatedSources, updatedSource)
 	}
 
 	updatedManifest := manifest.Manifest{
 		Target:  currentManifest.Target,
-		Sources: sources,
+		Sources: updatedSources,
 	}
 	if err := updatedManifest.Write(outputPath); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
 	return nil
+}
+
+func findSourceInManifest(imageManifest manifest.Manifest, image string) (manifest.Source, bool) {
+	for _, currentSource := range imageManifest.Sources {
+		imagePath := docker.RegistryPath(image)
+		sourceImagePath := docker.RegistryPath(currentSource.Image())
+		targetImagePath := docker.RegistryPath(currentSource.TargetImage())
+
+		if imagePath.Host() == sourceImagePath.Host() && imagePath.Repository() == sourceImagePath.Repository() {
+			return currentSource, true
+		}
+
+		if imagePath.Host() == targetImagePath.Host() && imagePath.Repository() == targetImagePath.Repository() {
+			return currentSource, true
+		}
+	}
+
+	return manifest.Source{}, false
 }

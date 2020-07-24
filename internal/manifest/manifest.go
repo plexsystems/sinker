@@ -177,6 +177,8 @@ func (s Source) EncodedAuth() (string, error) {
 
 // GetSourcesFromImages returns the given images as sources with the specified target.
 func GetSourcesFromImages(images []string, target string) []Source {
+	images = dedupeImages(images)
+
 	targetRegistryPath := docker.RegistryPath(target)
 	sourceTarget := Target{
 		Host:       targetRegistryPath.Host(),
@@ -201,8 +203,8 @@ func GetSourcesFromImages(images []string, target string) []Source {
 	return sources
 }
 
-// GetImagesFromStandardIn gets a list of images passed in by standard input.
-func GetImagesFromStandardIn() ([]string, error) {
+// GetImagesFromStandardInput gets a list of images passed in by standard input.
+func GetImagesFromStandardInput() ([]string, error) {
 	standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
 	contents, err := ioutil.ReadAll(standardInReader)
 	if err != nil {
@@ -210,6 +212,7 @@ func GetImagesFromStandardIn() ([]string, error) {
 	}
 
 	images := strings.Split(string(contents), " ")
+	images = dedupeImages(images)
 	return images, nil
 }
 
@@ -220,28 +223,23 @@ func GetImagesFromStandardIn() ([]string, error) {
 // Host: quay.io
 // Repository: coreos/prometheus-operator
 func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
-	var originals []string
-	for _, image := range images {
-		if !contains(originals, image) {
-			originals = append(originals, image)
-		}
-	}
+	images = dedupeImages(images)
 
 	var containerImages []Source
-	for _, image := range originals {
+	for _, image := range images {
 		path := docker.RegistryPath(image)
 
 		// When the source host and the target host are the same, this means that the
 		// images that were retrieved are target images.
 		//
-		// In order to populate the source hosts  in the image manifest, we need to
+		// In order to populate the source hosts in the image manifest, we need to
 		// figure out what the source host of the image is.
 		//
 		// When the source host and target host are different, we can safely use the
-		// host found in the image definition.
+		// host found in the image definition as the source.
 		var sourceHost string
 		if path.Host() == target.Host {
-			sourceHost = getSourceHostFromRepository(path.Repository())
+			sourceHost = GetSourceHostFromRepository(path.Repository())
 		} else {
 			sourceHost = path.Host()
 		}
@@ -263,7 +261,7 @@ func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
 	return containerImages, nil
 }
 
-func getSourceHostFromRepository(repository string) string {
+func GetSourceHostFromRepository(repository string) string {
 	repositoryMappings := map[string]string{
 		"kubernetes-ingress-controller": "quay.io",
 		"coreos":                        "quay.io",
@@ -332,4 +330,15 @@ func hostSupportsNestedRepositories(host string) bool {
 	}
 
 	return true
+}
+
+func dedupeImages(images []string) []string {
+	var dedupedImages []string
+	for _, image := range images {
+		if !contains(dedupedImages, image) {
+			dedupedImages = append(dedupedImages, image)
+		}
+	}
+
+	return dedupedImages
 }
