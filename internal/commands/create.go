@@ -65,7 +65,7 @@ func runCreateCommand(path string, manifestPath string) error {
 	var images []string
 	var err error
 	if path == "-" {
-		images, err = manifest.GetImagesFromStandardIn()
+		images, err = manifest.GetImagesFromStandardInput()
 	} else if path != "" {
 		images, err = manifest.GetImagesFromKubernetesManifests(path)
 	}

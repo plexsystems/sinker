@@ -26,7 +26,7 @@ func TestGetSourceHostFromRepository(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		sourceHost := getSourceHostFromRepository(testCase.input)
+		sourceHost := GetSourceHostFromRepository(testCase.input)
 
 		if sourceHost != testCase.expectedSourceHost {
 			t.Errorf("expected source host to be %s, actual %s", testCase.expectedSourceHost, sourceHost)
