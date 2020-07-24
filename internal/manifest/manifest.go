@@ -60,6 +60,25 @@ func (m Manifest) Write(path string) error {
 	return nil
 }
 
+// FindSourceInManifest takes an image and attempts to find the associated reference in the manifest.
+func (m Manifest) FindSourceInManifest(image string) (Source, bool) {
+	for _, currentSource := range m.Sources {
+		imagePath := docker.RegistryPath(image)
+		sourceImagePath := docker.RegistryPath(currentSource.Image())
+		targetImagePath := docker.RegistryPath(currentSource.TargetImage())
+
+		if imagePath.Host() == sourceImagePath.Host() && imagePath.Repository() == sourceImagePath.Repository() {
+			return currentSource, true
+		}
+
+		if imagePath.Host() == targetImagePath.Host() && imagePath.Repository() == targetImagePath.Repository() {
+			return currentSource, true
+		}
+	}
+
+	return Source{}, false
+}
+
 // Auth is a username and password to authenticate to a registry.
 type Auth struct {
 	Username string `yaml:"username,omitempty"`

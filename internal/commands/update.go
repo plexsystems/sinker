@@ -66,25 +66,34 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 			Digest: updatedRegistryPath.Digest(),
 		}
 
-		foundSource, exists := findSourceInManifest(currentManifest, updatedImage)
+		// Attempt to find the source in the current manifest. If found, it's possible
+		// to re-use already set values, such as the host of the source registry.
+		//
+		// In the event the source cannot be found in the manifest, we must rely on
+		// trying to find the source registry from the repository the image is sourced from.
+		foundSource, exists := currentManifest.FindSourceInManifest(updatedImage)
 		if !exists {
 			updatedSource.Host = manifest.GetSourceHostFromRepository(updatedRegistryPath.Repository())
 			updatedSource.Repository = updatedRegistryPath.Repository()
 			updatedSources = append(updatedSources, updatedSource)
-			fmt.Println(updatedImage + "was not found.")
 			continue
 		}
 
+		updatedSource.Repository = foundSource.Repository
+		updatedSource.Host = foundSource.Host
+		updatedSource.Auth = foundSource.Auth
+
+		// If the target host (or repository) of the source does not match the manifest
+		// target host (or repository), it has been modified by the user.
+		//
+		// To preserve the current settings, set the manifest host and repository values
+		// to the ones present in the current manifest.
 		if foundSource.Target.Host != currentManifest.Target.Host {
 			updatedSource.Target.Host = foundSource.Target.Host
 		}
 		if foundSource.Target.Repository != currentManifest.Target.Repository {
 			updatedSource.Target.Repository = foundSource.Target.Repository
 		}
-
-		updatedSource.Repository = foundSource.Repository
-		updatedSource.Host = foundSource.Host
-		updatedSource.Auth = foundSource.Auth
 
 		updatedSources = append(updatedSources, updatedSource)
 	}
@@ -98,22 +107,4 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 	}
 
 	return nil
-}
-
-func findSourceInManifest(imageManifest manifest.Manifest, image string) (manifest.Source, bool) {
-	for _, currentSource := range imageManifest.Sources {
-		imagePath := docker.RegistryPath(image)
-		sourceImagePath := docker.RegistryPath(currentSource.Image())
-		targetImagePath := docker.RegistryPath(currentSource.TargetImage())
-
-		if imagePath.Host() == sourceImagePath.Host() && imagePath.Repository() == sourceImagePath.Repository() {
-			return currentSource, true
-		}
-
-		if imagePath.Host() == targetImagePath.Host() && imagePath.Repository() == targetImagePath.Repository() {
-			return currentSource, true
-		}
-	}
-
-	return manifest.Source{}, false
 }
