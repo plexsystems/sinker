@@ -1,0 +1,3 @@
+target:
+  host: plexdev.azurecr.io
+  repository: pcp

@@ -25,21 +25,22 @@ func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 		return nil, fmt.Errorf("get yaml files: %w", err)
 	}
 
-	yamlFiles, err := splitYamlFiles(files)
+	resources, err := splitResources(files)
 	if err != nil {
 		return nil, fmt.Errorf("split yaml files: %w", err)
 	}
 
 	var imageList []string
-	for _, yamlFile := range yamlFiles {
-		images, err := getImagesFromYamlFile(yamlFile)
+	for _, resource := range resources {
+		images, err := getImagesFromResource(resource)
 		if err != nil {
-			return nil, fmt.Errorf("get images from yaml: %w", err)
+			return nil, fmt.Errorf("get images from resource: %w", err)
 		}
 
 		imageList = append(imageList, images...)
 	}
 
+	imageList = dedupeImages(imageList)
 	return imageList, nil
 }
 
@@ -73,40 +74,48 @@ func getYamlFiles(path string) ([]string, error) {
 	return files, nil
 }
 
-func splitYamlFiles(files []string) ([][]byte, error) {
-	var yamlFiles [][]byte
+func splitResources(files []string) ([][]byte, error) {
+	var splitResources [][]byte
 	for _, file := range files {
 		fileContents, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("open file: %w", err)
 		}
 
-		var lineBreak string
-		if bytes.Contains(fileContents, []byte("\r\n")) && runtime.GOOS == "windows" {
-			lineBreak = "\r\n"
-		} else {
-			lineBreak = "\n"
+		if bytes.Contains(fileContents, []byte("---")) {
+			splitResources = append(splitResources, splitResourcesBySeparator(fileContents)...)
+			continue
 		}
 
-		individualYamlFiles := bytes.Split(fileContents, []byte(lineBreak+"---"+lineBreak))
-
-		yamlFiles = append(yamlFiles, individualYamlFiles...)
+		splitResources = append(splitResources, fileContents)
 	}
 
-	return yamlFiles, nil
+	return splitResources, nil
 }
 
-func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
+func splitResourcesBySeparator(resources []byte) [][]byte {
+	var lineBreak string
+	if bytes.Contains(resources, []byte("\r\n")) && runtime.GOOS == "windows" {
+		lineBreak = "\r\n"
+	} else {
+		lineBreak = "\n"
+	}
+
+	individualResources := bytes.Split(resources, []byte(lineBreak+"---"+lineBreak))
+	return individualResources
+}
+
+func getImagesFromResource(file []byte) ([]string, error) {
 
 	// If the yaml does not contain a TypeMeta, it will not be a valid
 	// Kubernetes resource and can be assumed to have no images.
 	var typeMeta metav1.TypeMeta
-	if err := kubeyaml.Unmarshal(yamlFile, &typeMeta); err != nil {
+	if err := kubeyaml.Unmarshal(file, &typeMeta); err != nil {
 		return []string{}, nil
 	}
 
 	if typeMeta.Kind == "Prometheus" {
-		prometheusImages, err := getPrometheusImages(yamlFile)
+		prometheusImages, err := getPrometheusImages(file)
 		if err != nil {
 			return nil, fmt.Errorf("get prometheus images: %w", err)
 		}
@@ -115,12 +124,21 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 	}
 
 	if typeMeta.Kind == "Alertmanager" {
-		alertmanagerImages, err := getAlertmanagerImages(yamlFile)
+		alertmanagerImages, err := getAlertmanagerImages(file)
 		if err != nil {
 			return nil, fmt.Errorf("get alertmanager images: %w", err)
 		}
 
 		return alertmanagerImages, nil
+	}
+
+	if typeMeta.Kind == "Pod" {
+		podImages, err := getPodImages(file)
+		if err != nil {
+			return nil, fmt.Errorf("get pod images: %w", err)
+		}
+
+		return podImages, nil
 	}
 
 	type BaseSpec struct {
@@ -132,7 +150,7 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 	}
 
 	var contents BaseType
-	if err := kubeyaml.Unmarshal(yamlFile, &contents); err != nil {
+	if err := kubeyaml.Unmarshal(file, &contents); err != nil {
 		return []string{}, nil
 	}
 
@@ -143,9 +161,9 @@ func getImagesFromYamlFile(yamlFile []byte) ([]string, error) {
 	return images, nil
 }
 
-func getPrometheusImages(yamlFile []byte) ([]string, error) {
+func getPrometheusImages(file []byte) ([]string, error) {
 	var prometheus promv1.Prometheus
-	if err := kubeyaml.Unmarshal(yamlFile, &prometheus); err != nil {
+	if err := kubeyaml.Unmarshal(file, &prometheus); err != nil {
 		return nil, fmt.Errorf("unmarshal prometheus: %w", err)
 	}
 
@@ -164,9 +182,9 @@ func getPrometheusImages(yamlFile []byte) ([]string, error) {
 	return images, nil
 }
 
-func getAlertmanagerImages(yamlFile []byte) ([]string, error) {
+func getAlertmanagerImages(file []byte) ([]string, error) {
 	var alertmanager promv1.Alertmanager
-	if err := kubeyaml.Unmarshal(yamlFile, &alertmanager); err != nil {
+	if err := kubeyaml.Unmarshal(file, &alertmanager); err != nil {
 		return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
 	}
 
@@ -185,6 +203,19 @@ func getAlertmanagerImages(yamlFile []byte) ([]string, error) {
 	return images, nil
 }
 
+func getPodImages(file []byte) ([]string, error) {
+	var pod corev1.PodTemplateSpec
+	if err := kubeyaml.Unmarshal(file, &pod); err != nil {
+		return nil, fmt.Errorf("unmarshal pod: %w", err)
+	}
+
+	var images []string
+	images = append(images, getImagesFromContainers(pod.Spec.Containers)...)
+	images = append(images, getImagesFromContainers(pod.Spec.InitContainers)...)
+
+	return images, nil
+}
+
 func getImagesFromContainers(containers []corev1.Container) []string {
 	var images []string
 	for _, container := range containers {
@@ -198,6 +229,9 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 			image := strings.Split(arg, "=")[1]
 
 			registryPath := docker.RegistryPath(image)
+			if registryPath.Repository() == "" {
+				continue
+			}
 
 			if strings.Contains(registryPath.Repository(), ":") {
 				continue
