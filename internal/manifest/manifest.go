@@ -60,23 +60,59 @@ func (m Manifest) Write(path string) error {
 	return nil
 }
 
-// FindSourceInManifest takes an image and attempts to find the associated reference in the manifest.
-func (m Manifest) FindSourceInManifest(image string) (Source, bool) {
-	for _, currentSource := range m.Sources {
-		imagePath := docker.RegistryPath(image)
-		sourceImagePath := docker.RegistryPath(currentSource.Image())
-		targetImagePath := docker.RegistryPath(currentSource.TargetImage())
+func (m Manifest) Update(images []string) Manifest {
+	var updatedSources []Source
+	for _, updatedImage := range images {
+		updatedRegistryPath := docker.RegistryPath(updatedImage)
 
-		if imagePath.Host() == sourceImagePath.Host() && imagePath.Repository() == sourceImagePath.Repository() {
-			return currentSource, true
+		updatedSource := Source{
+			Tag:    updatedRegistryPath.Tag(),
+			Digest: updatedRegistryPath.Digest(),
 		}
 
-		if imagePath.Host() == targetImagePath.Host() && imagePath.Repository() == targetImagePath.Repository() {
-			return currentSource, true
+		// Attempt to find the source in the current manifest. If found, it's possible
+		// to re-use already set values, such as the host of the source registry.
+		//
+		// In the event the source cannot be found in the manifest, we must rely on
+		// trying to find the source registry from the repository the image is sourced from.
+		foundSource, exists := m.findSourceInManifest(updatedImage)
+		if !exists {
+			updatedSource.Host = getSourceHostFromRepository(updatedRegistryPath.Repository())
+
+			updatedRepository := updatedRegistryPath.Repository()
+			updatedRepository = strings.Replace(updatedRepository, m.Target.Repository, "", 1)
+			updatedRepository = strings.TrimLeft(updatedRepository, "/")
+			updatedSource.Repository = updatedRepository
+
+			updatedSources = append(updatedSources, updatedSource)
+			continue
 		}
+
+		updatedSource.Repository = foundSource.Repository
+		updatedSource.Host = foundSource.Host
+		updatedSource.Auth = foundSource.Auth
+
+		// If the target host (or repository) of the source does not match the manifest
+		// target host (or repository), it has been modified by the user.
+		//
+		// To preserve the current settings, set the manifest host and repository values
+		// to the ones present in the current manifest.
+		if foundSource.Target.Host != m.Target.Host {
+			updatedSource.Target.Host = foundSource.Target.Host
+		}
+		if foundSource.Target.Repository != m.Target.Repository {
+			updatedSource.Target.Repository = foundSource.Target.Repository
+		}
+
+		updatedSources = append(updatedSources, updatedSource)
 	}
 
-	return Source{}, false
+	updatedManifest := Manifest{
+		Target:  m.Target,
+		Sources: updatedSources,
+	}
+
+	return updatedManifest
 }
 
 // Auth is a username and password to authenticate to a registry.
@@ -235,52 +271,7 @@ func GetImagesFromStandardInput() ([]string, error) {
 	return images, nil
 }
 
-// GetSourcesFromTarget gets a list of sources using images with a registry path already at the target.
-// This is useful when you need to do a reverse look-up of the images to see where they were originally sourced from.
-//
-// For example, a list with a single image, myhost.com/myrepo/coreos/prometheus-operator would return a Source of:
-// Host: quay.io
-// Repository: coreos/prometheus-operator
-func GetSourcesFromTarget(images []string, target Target) ([]Source, error) {
-	images = dedupeImages(images)
-
-	var containerImages []Source
-	for _, image := range images {
-		path := docker.RegistryPath(image)
-
-		// When the source host and the target host are the same, this means that the
-		// images that were retrieved are target images.
-		//
-		// In order to populate the source hosts in the image manifest, we need to
-		// figure out what the source host of the image is.
-		//
-		// When the source host and target host are different, we can safely use the
-		// host found in the image definition as the source.
-		var sourceHost string
-		if path.Host() == target.Host {
-			sourceHost = GetSourceHostFromRepository(path.Repository())
-		} else {
-			sourceHost = path.Host()
-		}
-
-		sourceRepository := path.Repository()
-		sourceRepository = strings.Replace(sourceRepository, target.Repository, "", 1)
-		sourceRepository = strings.TrimLeft(sourceRepository, "/")
-
-		source := Source{
-			Host:       sourceHost,
-			Repository: sourceRepository,
-			Tag:        path.Tag(),
-			Digest:     path.Digest(),
-		}
-
-		containerImages = append(containerImages, source)
-	}
-
-	return containerImages, nil
-}
-
-func GetSourceHostFromRepository(repository string) string {
+func getSourceHostFromRepository(repository string) string {
 	repositoryMappings := map[string]string{
 		"kubernetes-ingress-controller": "quay.io",
 		"coreos":                        "quay.io",
@@ -304,6 +295,24 @@ func GetSourceHostFromRepository(repository string) string {
 
 	// An empty host refers to an image that is on Docker Hub.
 	return ""
+}
+
+func (m Manifest) findSourceInManifest(image string) (Source, bool) {
+	for _, currentSource := range m.Sources {
+		imagePath := docker.RegistryPath(image)
+		sourceImagePath := docker.RegistryPath(currentSource.Image())
+		targetImagePath := docker.RegistryPath(currentSource.TargetImage())
+
+		if imagePath.Host() == sourceImagePath.Host() && imagePath.Repository() == sourceImagePath.Repository() {
+			return currentSource, true
+		}
+
+		if imagePath.Host() == targetImagePath.Host() && imagePath.Repository() == targetImagePath.Repository() {
+			return currentSource, true
+		}
+	}
+
+	return Source{}, false
 }
 
 func getManifestLocation(path string) string {
