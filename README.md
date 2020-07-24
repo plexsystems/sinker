@@ -153,7 +153,7 @@ A list of images to check updates for, delimeted by commas.
 Create an image manifest that will sync images to the given target registry.
 
 ```shell
-$ sinker create <file|directory> --target mycompany.com/myteam
+$ sinker create <file|directory|standard input> --target mycompany.com/myteam
 ```
 
 #### --target flag (required)
@@ -168,9 +168,9 @@ Outputs the updated manifest to the specified path.
 
 - If a path is a yaml file, the manifest will be created at the given path.
 
-#### Passing in a directory or file (optional)
+#### Passing in a search critera
 
-Find all image references in the file or directory that was passed in.
+Find all image references in the search criteria (file, directory, etc)
 
 While this tool is not Kubernetes specific, currently the `create` and `update` commands can take a file or directory to find all Kubernetes manifests and extract the image references from them. This includes images specified in container arguments as well as CRDs such as `Prometheus` and `Alertmanager`.
 
@@ -195,12 +195,18 @@ sources:
   tag: v0.40.0
 ```
 
+Additionally, standard input is accepted. This is useful for creating and updating manifests based on images found in currently active Kubernetes clusters.
+
+```shell
+$ kubectl get pods --all-namespaces -o jsonpath="{.items[*].spec.containers[*].image}" | ./sinker create - --target repo
+```
+
 ### Update command
 
 Updates the current image manifest to reflect new changes found in the Kubernetes manifest(s).
 
 ```shell
-$ sinker update <file|directory>
+$ sinker update <file|directory|standard input>
 ```
 
 #### --output flag (optional)

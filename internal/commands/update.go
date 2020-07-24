@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/plexsystems/sinker/internal/docker"
 	"github.com/plexsystems/sinker/internal/manifest"
@@ -74,7 +75,12 @@ func runUpdateCommand(path string, manifestPath string, outputPath string) error
 		foundSource, exists := currentManifest.FindSourceInManifest(updatedImage)
 		if !exists {
 			updatedSource.Host = manifest.GetSourceHostFromRepository(updatedRegistryPath.Repository())
-			updatedSource.Repository = updatedRegistryPath.Repository()
+
+			updatedRepository := updatedRegistryPath.Repository()
+			updatedRepository = strings.Replace(updatedRepository, currentManifest.Target.Repository, "", 1)
+			updatedRepository = strings.TrimLeft(updatedRepository, "/")
+			updatedSource.Repository = updatedRepository
+
 			updatedSources = append(updatedSources, updatedSource)
 			continue
 		}
