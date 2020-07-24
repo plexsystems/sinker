@@ -73,17 +73,12 @@ func runCreateCommand(path string, manifestPath string) error {
 		return fmt.Errorf("get images: %w", err)
 	}
 
-	sources, err := manifest.GetSourcesFromTarget(images, target)
-	if err != nil {
-		return fmt.Errorf("get sources: %w", err)
+	emptyManifest := manifest.Manifest{
+		Target: target,
 	}
 
-	manifest := manifest.Manifest{
-		Target:  target,
-		Sources: sources,
-	}
-
-	if err := manifest.Write(manifestPath); err != nil {
+	newManifest := emptyManifest.Update(images)
+	if err := newManifest.Write(manifestPath); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
