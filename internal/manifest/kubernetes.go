@@ -27,7 +27,7 @@ func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 
 	resources, err := splitResources(files)
 	if err != nil {
-		return nil, fmt.Errorf("split yaml files: %w", err)
+		return nil, fmt.Errorf("split resources: %w", err)
 	}
 
 	var imageList []string
@@ -74,20 +74,20 @@ func getYamlFiles(path string) ([]string, error) {
 	return files, nil
 }
 
-func splitResources(files []string) ([][]byte, error) {
+func splitResources(resources []string) ([][]byte, error) {
 	var splitResources [][]byte
-	for _, file := range files {
-		fileContents, err := ioutil.ReadFile(file)
+	for _, resource := range resources {
+		resourceContents, err := ioutil.ReadFile(resource)
 		if err != nil {
-			return nil, fmt.Errorf("open file: %w", err)
+			return nil, fmt.Errorf("read file: %w", err)
 		}
 
-		if bytes.Contains(fileContents, []byte("---")) {
-			splitResources = append(splitResources, splitResourcesBySeparator(fileContents)...)
+		if bytes.Contains(resourceContents, []byte("---")) {
+			splitResources = append(splitResources, splitResourcesBySeparator(resourceContents)...)
 			continue
 		}
 
-		splitResources = append(splitResources, fileContents)
+		splitResources = append(splitResources, resourceContents)
 	}
 
 	return splitResources, nil
@@ -105,17 +105,17 @@ func splitResourcesBySeparator(resources []byte) [][]byte {
 	return individualResources
 }
 
-func getImagesFromResource(file []byte) ([]string, error) {
+func getImagesFromResource(resource []byte) ([]string, error) {
 
-	// If the yaml does not contain a TypeMeta, it will not be a valid
+	// If the resource does not contain a TypeMeta, it will not be a valid
 	// Kubernetes resource and can be assumed to have no images.
 	var typeMeta metav1.TypeMeta
-	if err := kubeyaml.Unmarshal(file, &typeMeta); err != nil {
+	if err := kubeyaml.Unmarshal(resource, &typeMeta); err != nil {
 		return []string{}, nil
 	}
 
 	if typeMeta.Kind == "Prometheus" {
-		prometheusImages, err := getPrometheusImages(file)
+		prometheusImages, err := getPrometheusImages(resource)
 		if err != nil {
 			return nil, fmt.Errorf("get prometheus images: %w", err)
 		}
@@ -124,7 +124,7 @@ func getImagesFromResource(file []byte) ([]string, error) {
 	}
 
 	if typeMeta.Kind == "Alertmanager" {
-		alertmanagerImages, err := getAlertmanagerImages(file)
+		alertmanagerImages, err := getAlertmanagerImages(resource)
 		if err != nil {
 			return nil, fmt.Errorf("get alertmanager images: %w", err)
 		}
@@ -133,7 +133,7 @@ func getImagesFromResource(file []byte) ([]string, error) {
 	}
 
 	if typeMeta.Kind == "Pod" {
-		podImages, err := getPodImages(file)
+		podImages, err := getPodImages(resource)
 		if err != nil {
 			return nil, fmt.Errorf("get pod images: %w", err)
 		}
@@ -150,7 +150,7 @@ func getImagesFromResource(file []byte) ([]string, error) {
 	}
 
 	var contents BaseType
-	if err := kubeyaml.Unmarshal(file, &contents); err != nil {
+	if err := kubeyaml.Unmarshal(resource, &contents); err != nil {
 		return []string{}, nil
 	}
 
@@ -161,9 +161,9 @@ func getImagesFromResource(file []byte) ([]string, error) {
 	return images, nil
 }
 
-func getPrometheusImages(file []byte) ([]string, error) {
+func getPrometheusImages(resource []byte) ([]string, error) {
 	var prometheus promv1.Prometheus
-	if err := kubeyaml.Unmarshal(file, &prometheus); err != nil {
+	if err := kubeyaml.Unmarshal(resource, &prometheus); err != nil {
 		return nil, fmt.Errorf("unmarshal prometheus: %w", err)
 	}
 
@@ -182,9 +182,9 @@ func getPrometheusImages(file []byte) ([]string, error) {
 	return images, nil
 }
 
-func getAlertmanagerImages(file []byte) ([]string, error) {
+func getAlertmanagerImages(resource []byte) ([]string, error) {
 	var alertmanager promv1.Alertmanager
-	if err := kubeyaml.Unmarshal(file, &alertmanager); err != nil {
+	if err := kubeyaml.Unmarshal(resource, &alertmanager); err != nil {
 		return nil, fmt.Errorf("unmarshal alertmanager: %w", err)
 	}
 
@@ -203,9 +203,9 @@ func getAlertmanagerImages(file []byte) ([]string, error) {
 	return images, nil
 }
 
-func getPodImages(file []byte) ([]string, error) {
+func getPodImages(resource []byte) ([]string, error) {
 	var pod corev1.PodTemplateSpec
-	if err := kubeyaml.Unmarshal(file, &pod); err != nil {
+	if err := kubeyaml.Unmarshal(resource, &pod); err != nil {
 		return nil, fmt.Errorf("unmarshal pod: %w", err)
 	}
 

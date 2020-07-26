@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Pod
-metadata:
-  name: containers-image-latest-tag-test
-spec:
-  containers:
-  - name: containers-image-latest-tag-test
-    image: plexdev.azurecr.io/pcp/test:latest

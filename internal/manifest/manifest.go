@@ -265,12 +265,19 @@ func GetSourcesFromImages(images []string, target string) []Source {
 // GetImagesFromStandardInput gets a list of images passed in by standard input.
 func GetImagesFromStandardInput() ([]string, error) {
 	standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
-	contents, err := ioutil.ReadAll(standardInReader)
+	byteContents, err := ioutil.ReadAll(standardInReader)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
+	contents := string(byteContents)
 
-	images := strings.Split(string(contents), " ")
+	var images []string
+	if strings.Contains(contents, " ") {
+		images = strings.Split(string(contents), " ")
+	} else if strings.Contains(contents, "\n") {
+		images = strings.Split(string(contents), "\n")
+	}
+
 	images = dedupeImages(images)
 	return images, nil
 }
@@ -367,6 +374,10 @@ func hostSupportsNestedRepositories(host string) bool {
 func dedupeImages(images []string) []string {
 	var dedupedImages []string
 	for _, image := range images {
+		if image == "" {
+			continue
+		}
+
 		if !contains(dedupedImages, image) {
 			dedupedImages = append(dedupedImages, image)
 		}
