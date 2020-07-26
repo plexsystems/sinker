@@ -25,8 +25,12 @@ func newCheckCommand() *cobra.Command {
 				return fmt.Errorf("bind images flag: %w", err)
 			}
 
-			manifestPath := viper.GetString("manifest")
-			if err := runCheckCommand(manifestPath); err != nil {
+			var input string
+			if len(args) > 0 {
+				input = "-"
+			}
+
+			if err := runCheckCommand(input); err != nil {
 				return fmt.Errorf("check: %w", err)
 			}
 
@@ -39,7 +43,7 @@ func newCheckCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCheckCommand(manifestPath string) error {
+func runCheckCommand(input string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -48,9 +52,13 @@ func runCheckCommand(manifestPath string) error {
 		return fmt.Errorf("new client: %w", err)
 	}
 
-	imagesToCheck := viper.GetStringSlice("images")
-	if len(imagesToCheck) == 0 {
-		imageManifest, err := manifest.Get(manifestPath)
+	var imagesToCheck []string
+	if input == "-" {
+		imagesToCheck, err = manifest.GetImagesFromStandardInput()
+	} else if len(viper.GetStringSlice("images")) > 0 {
+		imagesToCheck = viper.GetStringSlice("images")
+	} else {
+		imageManifest, err := manifest.Get(viper.GetString("manifest"))
 		if err != nil {
 			return fmt.Errorf("get manifest: %w", err)
 		}
@@ -58,6 +66,9 @@ func runCheckCommand(manifestPath string) error {
 		for _, source := range imageManifest.Sources {
 			imagesToCheck = append(imagesToCheck, source.Image())
 		}
+	}
+	if err != nil {
+		return fmt.Errorf("get images to check: %w", err)
 	}
 
 	var images []docker.RegistryPath

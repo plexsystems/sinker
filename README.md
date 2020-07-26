@@ -141,7 +141,7 @@ Outputs the list to a file (e.g. `source-images.txt`).
 Checks if any of the source images found in the image manifest have new updates.
 
 ```shell
-$ sinker check
+$ sinker check <standard input>
 ```
 
 #### --images flag (optional)
@@ -199,6 +199,10 @@ Additionally, standard input is accepted. This is useful for creating and updati
 
 ```shell
 $ kubectl get pods --all-namespaces -o jsonpath="{.items[*].spec.containers[*].image}" | ./sinker create - --target repo
+```
+
+```shell
+$ kubectl get pods --all-namespaces -o jsonpath="{.items[*].spec.containers[*].image}" | ./sinker update -
 ```
 
 ### Update command
