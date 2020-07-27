@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -20,18 +19,29 @@ import (
 // GetImagesFromKubernetesManifests returns all images found in Kubernetes manifests
 // that are located at the specified path.
 func GetImagesFromKubernetesManifests(path string) ([]string, error) {
-	files, err := getYamlFiles(path)
+	resources, err := getResourceContentsFromYamlFiles(path)
 	if err != nil {
 		return nil, fmt.Errorf("get yaml files: %w", err)
 	}
 
-	resources, err := splitResources(files)
+	images, err := GetImagesFromKubernetesResources(resources)
+	if err != nil {
+		return nil, fmt.Errorf("get images from resources: %w", err)
+	}
+
+	return images, nil
+}
+
+// GetImagesFromKubernetesResources returns all images found in Kubernetes resources that have
+// already been read from the disk, or are being read from standard input.
+func GetImagesFromKubernetesResources(resources []string) ([]string, error) {
+	splitResources, err := splitResources(resources)
 	if err != nil {
 		return nil, fmt.Errorf("split resources: %w", err)
 	}
 
 	var imageList []string
-	for _, resource := range resources {
+	for _, resource := range splitResources {
 		images, err := getImagesFromResource(resource)
 		if err != nil {
 			return nil, fmt.Errorf("get images from resource: %w", err)
@@ -44,8 +54,8 @@ func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 	return imageList, nil
 }
 
-func getYamlFiles(path string) ([]string, error) {
-	var files []string
+func getResourceContentsFromYamlFiles(path string) ([]string, error) {
+	var filePaths []string
 	err := filepath.Walk(path, func(currentFilePath string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("walk path: %w", err)
@@ -63,7 +73,7 @@ func getYamlFiles(path string) ([]string, error) {
 			return nil
 		}
 
-		files = append(files, currentFilePath)
+		filePaths = append(filePaths, currentFilePath)
 
 		return nil
 	})
@@ -71,51 +81,48 @@ func getYamlFiles(path string) ([]string, error) {
 		return nil, err
 	}
 
-	return files, nil
-}
-
-func splitResources(resources []string) ([][]byte, error) {
-	var splitResources [][]byte
-	for _, resource := range resources {
-		resourceContents, err := ioutil.ReadFile(resource)
+	var fileContents []string
+	for _, filePath := range filePaths {
+		contents, err := ioutil.ReadFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("read file: %w", err)
 		}
 
-		if bytes.Contains(resourceContents, []byte("---")) {
-			splitResources = append(splitResources, splitResourcesBySeparator(resourceContents)...)
-			continue
+		fileContents = append(fileContents, string(contents))
+	}
+
+	return fileContents, nil
+}
+
+func splitResources(resources []string) ([]string, error) {
+	var splitResources []string
+	for _, resourceContents := range resources {
+		var lineBreak string
+		if strings.Contains(resourceContents, "\r\n") && runtime.GOOS == "windows" {
+			lineBreak = "\r\n"
+		} else {
+			lineBreak = "\n"
 		}
 
-		splitResources = append(splitResources, resourceContents)
+		individualResources := strings.Split(resourceContents, lineBreak+"---"+lineBreak)
+		splitResources = append(splitResources, individualResources...)
 	}
 
 	return splitResources, nil
 }
 
-func splitResourcesBySeparator(resources []byte) [][]byte {
-	var lineBreak string
-	if bytes.Contains(resources, []byte("\r\n")) && runtime.GOOS == "windows" {
-		lineBreak = "\r\n"
-	} else {
-		lineBreak = "\n"
-	}
-
-	individualResources := bytes.Split(resources, []byte(lineBreak+"---"+lineBreak))
-	return individualResources
-}
-
-func getImagesFromResource(resource []byte) ([]string, error) {
+func getImagesFromResource(resource string) ([]string, error) {
+	byteResource := []byte(resource)
 
 	// If the resource does not contain a TypeMeta, it will not be a valid
 	// Kubernetes resource and can be assumed to have no images.
 	var typeMeta metav1.TypeMeta
-	if err := kubeyaml.Unmarshal(resource, &typeMeta); err != nil {
+	if err := kubeyaml.Unmarshal(byteResource, &typeMeta); err != nil {
 		return []string{}, nil
 	}
 
 	if typeMeta.Kind == "Prometheus" {
-		prometheusImages, err := getPrometheusImages(resource)
+		prometheusImages, err := getPrometheusImages(byteResource)
 		if err != nil {
 			return nil, fmt.Errorf("get prometheus images: %w", err)
 		}
@@ -124,7 +131,7 @@ func getImagesFromResource(resource []byte) ([]string, error) {
 	}
 
 	if typeMeta.Kind == "Alertmanager" {
-		alertmanagerImages, err := getAlertmanagerImages(resource)
+		alertmanagerImages, err := getAlertmanagerImages(byteResource)
 		if err != nil {
 			return nil, fmt.Errorf("get alertmanager images: %w", err)
 		}
@@ -133,7 +140,7 @@ func getImagesFromResource(resource []byte) ([]string, error) {
 	}
 
 	if typeMeta.Kind == "Pod" {
-		podImages, err := getPodImages(resource)
+		podImages, err := getPodImages(byteResource)
 		if err != nil {
 			return nil, fmt.Errorf("get pod images: %w", err)
 		}
@@ -150,7 +157,7 @@ func getImagesFromResource(resource []byte) ([]string, error) {
 	}
 
 	var contents BaseType
-	if err := kubeyaml.Unmarshal(resource, &contents); err != nil {
+	if err := kubeyaml.Unmarshal(byteResource, &contents); err != nil {
 		return []string{}, nil
 	}
 

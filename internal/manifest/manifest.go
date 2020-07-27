@@ -272,6 +272,15 @@ func GetImagesFromStandardInput() ([]string, error) {
 	}
 	contents := string(byteContents)
 
+	if strings.Contains(contents, "---") {
+		images, err := GetImagesFromKubernetesResources([]string{contents})
+		if err != nil {
+			return nil, fmt.Errorf("get images from resources: %w", err)
+		}
+
+		return images, nil
+	}
+
 	var images []string
 	if strings.Contains(contents, " ") {
 		images = strings.Split(string(contents), " ")
