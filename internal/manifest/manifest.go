@@ -70,19 +70,15 @@ func (m Manifest) Update(images []string) Manifest {
 			Digest: updatedRegistryPath.Digest(),
 		}
 
-		// Attempt to find the source in the current manifest. If found, it's possible
-		// to re-use already set values, such as the host of the source registry.
-		//
-		// In the event the source cannot be found in the manifest, we must rely on
-		// trying to find the source registry from the repository the image is sourced from.
 		foundSource, exists := m.findSourceInManifest(updatedImage)
 		if !exists {
 
 			// When the source host and the target host are the same, this means that the
-			// images that were retrieved are target images.
+			// images that were retrieved are target images. Therefore, we must attempt to
+			// find the source host from the repository of the image.
 			//
 			// When the source host and target host are different, we can safely use the
-			// host found in the image definition as the source.
+			// host found in the image manifest as the source.
 			updatedSource.Host = updatedRegistryPath.Host()
 			if updatedRegistryPath.Host() == m.Target.Host {
 				updatedSource.Host = getSourceHostFromRepository(updatedRegistryPath.Repository())
