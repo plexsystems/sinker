@@ -8,13 +8,18 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	// sinkerVersion is set at build time.
+	sinkerVersion = ""
+)
+
 // NewDefaultCommand creates the default command.
 func NewDefaultCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:     path.Base(os.Args[0]),
 		Short:   "sinker",
 		Long:    "A tool to sync container images to another container registry",
-		Version: "0.11.0",
+		Version: sinkerVersion,
 	}
 
 	cmd.PersistentFlags().StringP("manifest", "m", "", "Path where the manifest file is (defaults to .images.yaml in the current directory)")

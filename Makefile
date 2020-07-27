@@ -17,6 +17,7 @@ acceptance:
 
 .PHONY: release
 release:
-	GOOS=darwin GOARCH=amd64 go build -o sinker-darwin-amd64
-	GOOS=windows GOARCH=amd64 go build -o sinker-windows-amd64
-	GOOS=linux GOARCH=amd64 go build -o sinker-linux-amd64
+	@test $(version)
+	GOOS=darwin GOARCH=amd64 go build -o sinker-darwin-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
+	GOOS=windows GOARCH=amd64 go build -o sinker-windows-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
+	GOOS=linux GOARCH=amd64 go build -o sinker-linux-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
