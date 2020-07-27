@@ -1,0 +1,6 @@
+target:
+  host: myhost.com
+sources:
+- repository: some/image
+  host: otherhost.com
+  tag: v1.0.0

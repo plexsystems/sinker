@@ -13,12 +13,15 @@
 @test "[CREATE] New manifest with autodetection creates example manifest" {
   run ./sinker create example/bundle.yaml --target mycompany.com/myrepo --manifest example/output.yaml
 
-  if !(cmp -s "example/.images.yaml" "example/output.yaml"); then
-    rm example/output.yaml
-    return 1
-  fi
+  cmp -s "example/.images.yaml" "example/output.yaml"
+  rm -f example/output.yaml
+}
 
-  rm example/output.yaml
+@test "[CREATE] New manifest with autodetection image host different from target" {
+  run ./sinker create test/create/bundle.yaml --target myhost.com --output test/create/output.yaml
+
+  cmp -s "test/create/expected-images.yaml" "test/create/output.yaml"
+  rm -f test/create/output.yaml
 }
 
 @test "[UPDATE] Updating manifest matches expected manifest" {
