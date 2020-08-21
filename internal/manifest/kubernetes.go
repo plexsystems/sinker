@@ -229,11 +229,16 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 		images = append(images, container.Image)
 
 		for _, arg := range container.Args {
-			if !strings.Contains(arg, ":") || strings.Contains(arg, "=:") {
-				continue
+			var image string
+			if strings.Contains(arg, "=") {
+				image = strings.Split(arg, "=")[1]
+			} else {
+				image = arg
 			}
 
-			image := strings.Split(arg, "=")[1]
+			if !strings.Contains(image, ":") || strings.Contains(image, "=:") {
+				continue
+			}
 
 			registryPath := docker.RegistryPath(image)
 			if registryPath.Repository() == "" {
