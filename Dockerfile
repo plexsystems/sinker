@@ -23,6 +23,7 @@ LABEL org.opencontainers.image.source="https://github.com/plexsystems/sinker" \
 RUN set -eux \
     && addgroup -g 1001 -S sinker \
     && adduser -S -D -H -u 1001 -s /sbin/nologin -G sinker -g sinker sinker
+RUN apk update && apk add --no-cache docker-cli
 
 COPY --from=builder /build/sinker /usr/bin/
 
