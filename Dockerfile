@@ -26,8 +26,8 @@ RUN set -eux \
     && addgroup -g 1001 -S sinker \
     && adduser -S -D -H -u 1001 -s /sbin/nologin -G sinker -g sinker sinker
 
-COPY --from=builder /build/sinker .
+COPY --from=builder /build/sinker /usr/bin/
 
 USER sinker
 
-ENTRYPOINT ["./sinker"]
+ENTRYPOINT ["/usr/bin/sinker"]
