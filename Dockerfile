@@ -19,8 +19,6 @@ LABEL org.opencontainers.image.source="https://github.com/plexsystems/sinker" \
       org.opencontainers.image.authors="John Reese <john@reese.dev>" \
       org.opencontainers.image.description="Application to sync images from one registry to another"
 
-WORKDIR /app/
-
 # explicitly set user/group IDs
 RUN set -eux \
     && addgroup -g 1001 -S sinker \
