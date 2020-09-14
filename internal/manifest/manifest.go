@@ -362,11 +362,6 @@ func getEncodedBasicAuth(username string, password string) (string, error) {
 
 func hostSupportsNestedRepositories(host string) bool {
 
-	// Google Container Registry (GCR)
-	if strings.Contains(host, "gcr.io") {
-		return false
-	}
-
 	// Quay.io
 	if strings.Contains(host, "quay.io") {
 		return false
