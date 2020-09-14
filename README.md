@@ -66,7 +66,7 @@ If the `target` registry supports nested paths, the entire source repository wil
 mycompany.com/myteam/coreos/prometheus-operator:v0.40.0
 ```
 
-**Registries that support nested paths:** Azure Container Registry (ACR), Amazon Elastic Container Registry (ECR)
+**Registries that support nested paths:** Azure Container Registry (ACR), Amazon Elastic Container Registry (ECR), Google Container Registry (GCR)
 
 If the `target` registry does _not_ support nested paths, only the base path of the source will be pushed to the target registry. For example, the `prometheus-operator` would be pushed to:
 
