@@ -188,6 +188,9 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 				if strings.EqualFold("MANIFEST_UNKNOWN", string(diagnostic.Code)) {
 					return false, nil
 				}
+				if strings.EqualFold("NOT_FOUND", string(diagnostic.Code)) {
+					return false, nil
+				}
 			}
 		}
 
