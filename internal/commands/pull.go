@@ -80,7 +80,7 @@ func runPullCommand(origin string, manifestPath string) error {
 	for image, auth := range imagesToPull {
 		log.Infof("Pulling %s", image)
 		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
-			return fmt.Errorf("pull image and wait: %w", err)
+			log.Errorf("pull image and wait: " + err.Error())
 		}
 	}
 
