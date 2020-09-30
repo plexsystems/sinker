@@ -23,8 +23,8 @@ type Client struct {
 	logInfo func(format string, args ...interface{})
 }
 
-// NewClient returns a Docker client configured with the given information logger.
-func NewClient(logInfo func(format string, args ...interface{})) (Client, error) {
+// New returns a Docker client configured with the given information logger.
+func New(logInfo func(format string, args ...interface{})) (Client, error) {
 	retry.DefaultDelay = 5 * time.Second
 	retry.DefaultAttempts = 2
 
@@ -41,11 +41,11 @@ func NewClient(logInfo func(format string, args ...interface{})) (Client, error)
 	return client, nil
 }
 
-// PushImageAndWait pushes an image and waits for it to finish pushing.
+// PushAndWait pushes an image and waits for it to finish pushing.
 // If an error occurs when pushing an image, the push will be attempted again before failing.
-func (c Client) PushImageAndWait(ctx context.Context, image string, auth string) error {
+func (c Client) PushAndWait(ctx context.Context, image string, auth string) error {
 	push := func() error {
-		if err := c.tryPushImageAndWait(ctx, image, auth); err != nil {
+		if err := c.tryPushAndWait(ctx, image, auth); err != nil {
 			return fmt.Errorf("try push image: %w", err)
 		}
 
@@ -63,11 +63,11 @@ func (c Client) PushImageAndWait(ctx context.Context, image string, auth string)
 	return nil
 }
 
-// PullImageAndWait pulls an image and waits for it to finish pulling.
+// PullAndWait pulls an image and waits for it to finish pulling.
 // If an error occurs when pulling an image, the pull will be attempted again before failing.
-func (c Client) PullImageAndWait(ctx context.Context, image string, auth string) error {
+func (c Client) PullAndWait(ctx context.Context, image string, auth string) error {
 	pull := func() error {
-		if err := c.tryPullImageAndWait(ctx, image, auth); err != nil {
+		if err := c.tryPullAndWait(ctx, image, auth); err != nil {
 			return fmt.Errorf("try pull image: %w", err)
 		}
 
@@ -170,10 +170,6 @@ func (c Client) Tag(ctx context.Context, sourceImage string, targetImage string)
 
 // ImageExistsAtRemote returns true if the image exists at the remote registry.
 func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, error) {
-	if hasLatestTag(image) {
-		return false, nil
-	}
-
 	reference, err := name.ParseReference(image, name.WeakValidation)
 	if err != nil {
 		return false, fmt.Errorf("parse ref: %w", err)
@@ -181,22 +177,33 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 
 	if _, err := remote.Get(reference, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
 
-		// If the error is a transport error, check that the error code is of type MANIFEST_UNKNOWN.
-		// This is the expected error if an image does not exist.
+		// If the error is a transport error, check that the error code is of type
+		// MANIFEST_UNKNOWN or NOT_FOUND. These errors are expected if an image does
+		// not exist in the registry.
 		if t, exists := err.(*transport.Error); exists {
 			for _, diagnostic := range t.Errors {
 				if strings.EqualFold("MANIFEST_UNKNOWN", string(diagnostic.Code)) {
 					return false, nil
 				}
+
 				if strings.EqualFold("NOT_FOUND", string(diagnostic.Code)) {
 					return false, nil
 				}
 			}
 		}
 
-		// If the error is not a transport error, some other error occured
-		// that is unrelated to checking if an image exists and it should be returned.
 		return false, fmt.Errorf("get image: %w", err)
+	}
+
+	// Always return false if the image has the latest tag as this method
+	// is used to determine if the image should be pushed or not. The latest
+	// tag is assumed to always need to be pushed, but a better approach
+	// would be to compare digests.
+	//
+	// This check must also be performed after the Get request to the remote
+	// registry to ensure that the client has appropriate access to pull the image.
+	if hasLatestTag(image) {
+		return false, nil
 	}
 
 	return true, nil
@@ -245,7 +252,7 @@ func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image strin
 	return nil
 }
 
-func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth string) error {
+func (c Client) tryPullAndWait(ctx context.Context, image string, auth string) error {
 	opts := types.ImagePullOptions{
 		RegistryAuth: auth,
 	}
@@ -266,7 +273,7 @@ func (c Client) tryPullImageAndWait(ctx context.Context, image string, auth stri
 	return nil
 }
 
-func (c Client) tryPushImageAndWait(ctx context.Context, image string, auth string) error {
+func (c Client) tryPushAndWait(ctx context.Context, image string, auth string) error {
 	opts := types.ImagePushOptions{
 		RegistryAuth: auth,
 	}

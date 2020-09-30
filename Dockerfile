@@ -1,32 +1,21 @@
-ARG GOLANG_VERSION=1.15.0
-ARG ALPINE_VERSION=3.12.0
+FROM golang:1.15.0 AS builder
 
-FROM golang:${GOLANG_VERSION} AS builder
 WORKDIR /build
 COPY . /build
 
 ENV CGO_ENABLED=0
 
-RUN go get && \
-    go build
+RUN go build
 
-FROM alpine:${ALPINE_VERSION}
-
-# OCI annotations (https://github.com/opencontainers/image-spec/blob/master/annotations.md)
-LABEL org.opencontainers.image.source="https://github.com/plexsystems/sinker" \
-    org.opencontainers.image.title="sinker" \
-    org.opencontainers.image.authors="John Reese <john@reese.dev>" \
-    org.opencontainers.image.description="Application to sync images from one registry to another"
-
-# explicitly set user/group IDs
-# RUN set -eux \
-#     && addgroup -g 1001 -S sinker \
-#     && adduser -S -D -H -u 1001 -s /sbin/nologin -G sinker -g sinker sinker
+FROM alpine:3.12.0
 
 RUN apk update && apk add --no-cache docker-cli
 
 COPY --from=builder /build/sinker /usr/bin/
 
-# USER sinker
+LABEL org.opencontainers.image.source="https://github.com/plexsystems/sinker"
+LABEL org.opencontainers.image.title="sinker"
+LABEL org.opencontainers.image.authors="John Reese <john@reese.dev>"
+LABEL org.opencontainers.image.description="Sync container images from one registry to another"
 
 ENTRYPOINT ["/usr/bin/sinker"]

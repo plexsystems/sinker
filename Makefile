@@ -1,19 +1,18 @@
 .PHONY: build
 build:
-	go build
+	@go build
 
 .PHONY: remove-images
 remove-images:
-	docker rmi `docker images -a -q`
+	@docker rmi `docker images -a -q`
 
 .PHONY: test
 test:
-	go test -v ./... -count=1
+	@go test -v ./... -count=1
 
 .PHONY: acceptance
-acceptance:
-	go build
-	bats acceptance.bats
+acceptance: build
+	@bats acceptance.bats
 
 .PHONY: release
 release:

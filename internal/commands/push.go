@@ -56,7 +56,7 @@ func runPushCommand(manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClient(log.Infof)
+	client, err := docker.New(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -112,7 +112,7 @@ func runPushCommand(manifestPath string) error {
 			if err != nil {
 				return fmt.Errorf("get source auth: %w", err)
 			}
-			if err := client.PullImageAndWait(ctx, source.Image(), sourceAuth); err != nil {
+			if err := client.PullAndWait(ctx, source.Image(), sourceAuth); err != nil {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
 		}
@@ -133,7 +133,7 @@ func runPushCommand(manifestPath string) error {
 		if err != nil {
 			return fmt.Errorf("get target auth: %w", err)
 		}
-		if err := client.PushImageAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
+		if err := client.PushAndWait(ctx, source.TargetImage(), targetAuth); err != nil {
 			return fmt.Errorf("push image and wait: %w", err)
 		}
 	}
