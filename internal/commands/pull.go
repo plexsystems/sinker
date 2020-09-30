@@ -48,7 +48,7 @@ func runPullCommand(origin string, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	client, err := docker.NewClient(log.Infof)
+	client, err := docker.New(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
@@ -77,9 +77,18 @@ func runPullCommand(origin string, manifestPath string) error {
 		}
 	}
 
+	// Iterate through each of the images to pull and verify if the client has
+	// the proper authorization to be able to successfully pull the images before
+	// performing the pull operation.
+	for image := range imagesToPull {
+		if _, err := client.ImageExistsAtRemote(ctx, image); err != nil {
+			return fmt.Errorf("validating remote image: %w", err)
+		}
+	}
+
 	for image, auth := range imagesToPull {
 		log.Infof("Pulling %s", image)
-		if err := client.PullImageAndWait(ctx, image, auth); err != nil {
+		if err := client.PullAndWait(ctx, image, auth); err != nil {
 			log.Errorf("pull image and wait: " + err.Error())
 		}
 	}
