@@ -1,11 +1,13 @@
 FROM golang:1.15.0 AS builder
 
+ENV CGO_ENABLED=0
+
 WORKDIR /build
 COPY . /build
 
-ENV CGO_ENABLED=0
-
-RUN go build
+# SINKER_VERSION is set during the release process
+ARG SINKER_VERSION=0.0.0
+RUN go build -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=${SINKER_VERSION}'"
 
 FROM alpine:3.12.0
 
