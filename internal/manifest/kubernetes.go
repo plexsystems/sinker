@@ -241,7 +241,7 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 			}
 
 			//Work-around for mis-identified image
-			if strings.Contains(image, "http://") {
+			if strings.Contains(image, "http://") || strings.Contains(image, "https://") {
 				continue
 			}
 

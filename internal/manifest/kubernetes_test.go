@@ -28,3 +28,29 @@ func TestGetImagesFromContainers_WithEqualSign(t *testing.T) {
 		t.Errorf("expected newlineimage:v1 to exist in list of images but it did not: %v", actual)
 	}
 }
+
+func TestGetImagesFromContainers_WithURLParameter(t *testing.T) {
+	containers := []corev1.Container{
+		{
+			Image: "baseimage:v1",
+			Args: []string{
+				"--events-addr=http://service/",
+				"--events-addr=https://service/",
+			},
+		},
+	}
+	actual := getImagesFromContainers(containers)
+
+	if !contains(actual, "baseimage:v1") {
+		t.Errorf("expected baseimage:v1 to exist in list of images but it did not: %v", actual)
+	}
+
+	if contains(actual, "http://service/") {
+		t.Errorf("Invalid image parsing for args contain http addresses: %v", actual)
+	}
+
+	if contains(actual, "https://service/") {
+		t.Errorf("Invalid image parsing for args contain https addresses: %v", actual)
+	}
+
+}
