@@ -240,6 +240,11 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				continue
 			}
 
+			//Work-around for mis-identified image
+			if strings.Contains(image, "http://") || strings.Contains(image, "https://") {
+				continue
+			}
+
 			registryPath := docker.RegistryPath(image)
 			if registryPath.Repository() == "" {
 				continue
