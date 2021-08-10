@@ -267,7 +267,7 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				}
 			}
 
-			if skiploop == true {
+			if skiploop {
 				continue
 			}
 
