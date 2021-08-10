@@ -225,6 +225,24 @@ func getPodImages(resource []byte) ([]string, error) {
 
 func getImagesFromContainers(containers []corev1.Container) []string {
 	var images []string
+
+	var imgStringsToFilter []string
+
+	//Work-around for mis-identified image parameters that include a URL
+	imgStringsToFilter = append(imgStringsToFilter, "http://")
+	imgStringsToFilter = append(imgStringsToFilter, "https://")
+
+	//Work around for Envoy/Istio log parameters (https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy.html#debugging-envoy)
+	// Too many componetns, so just targetting log levels.  Should be low instance of collusion between these values and actual image tags
+
+	imgStringsToFilter = append(imgStringsToFilter, ":trace")
+	imgStringsToFilter = append(imgStringsToFilter, ":debug")
+	imgStringsToFilter = append(imgStringsToFilter, ":info")
+	imgStringsToFilter = append(imgStringsToFilter, ":warn")
+	imgStringsToFilter = append(imgStringsToFilter, ":error")
+	imgStringsToFilter = append(imgStringsToFilter, ":critical")
+	imgStringsToFilter = append(imgStringsToFilter, ":off")
+
 	for _, container := range containers {
 		images = append(images, container.Image)
 
@@ -240,8 +258,16 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				continue
 			}
 
-			//Work-around for mis-identified image
-			if strings.Contains(image, "http://") || strings.Contains(image, "https://") {
+			// Filter out specific strings that are mis-interpreted as container images
+			var skiploop bool = false
+
+			for _, string := range imgStringsToFilter {
+				if strings.Contains(image, string) {
+					skiploop = true
+				}
+			}
+
+			if skiploop == true {
 				continue
 			}
 
