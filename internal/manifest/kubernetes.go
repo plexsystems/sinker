@@ -12,6 +12,7 @@ import (
 
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	kubeyaml "github.com/ghodss/yaml"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -148,6 +149,15 @@ func getImagesFromResource(resource string) ([]string, error) {
 		return podImages, nil
 	}
 
+	if typeMeta.Kind == "CronJob" {
+		cronJobImages, err := getCronJobImages(byteResource)
+		if err != nil {
+			return nil, fmt.Errorf("get cronjob images: %w", err)
+		}
+
+		return cronJobImages, nil
+	}
+
 	type BaseSpec struct {
 		Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 	}
@@ -219,6 +229,19 @@ func getPodImages(resource []byte) ([]string, error) {
 	var images []string
 	images = append(images, getImagesFromContainers(pod.Spec.Containers)...)
 	images = append(images, getImagesFromContainers(pod.Spec.InitContainers)...)
+
+	return images, nil
+}
+
+func getCronJobImages(resource []byte) ([]string, error) {
+	var cj batchv1beta1.CronJob
+	if err := kubeyaml.Unmarshal(resource, &cj); err != nil {
+		return nil, fmt.Errorf("unmarshal cronjob: %w", err)
+	}
+
+	var images []string
+	images = append(images, getImagesFromContainers(cj.Spec.JobTemplate.Spec.Template.Spec.Containers)...)
+	images = append(images, getImagesFromContainers(cj.Spec.JobTemplate.Spec.Template.Spec.InitContainers)...)
 
 	return images, nil
 }

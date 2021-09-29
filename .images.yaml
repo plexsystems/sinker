@@ -1,5 +1,5 @@
 target:
-  host: myhost.com
+  host: myregistry.nu
 sources:
 - repository: some/image
   host: otherhost.com
