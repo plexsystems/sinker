@@ -55,24 +55,29 @@ func TestGetImagesFromContainers_WithURLParameter(t *testing.T) {
 
 }
 
-func TestGetImagesFromContainers_WithIPParameter(t *testing.T) {
+// Envoy/Istio specify their log levels as component:level (See https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy.html#debugging-envoy)
+func TestGetImagesFromContainers_WithLogComponent(t *testing.T) {
 	containers := []corev1.Container{
 		{
 			Image: "baseimage:v1",
 			Args: []string{
-				"--serving-address=0.0.0.0:6443",
+				"--proxyComponentLogLevel=misc:error",
+				"--log_output_level=default:info",
 			},
 		},
 	}
-
 	actual := getImagesFromContainers(containers)
 
 	if !contains(actual, "baseimage:v1") {
 		t.Errorf("expected baseimage:v1 to exist in list of images but it did not: %v", actual)
 	}
 
-	if contains(actual, "0.0.0.0:6443") {
-		t.Errorf("Invalid image parsing for args contain ip addresses: %v", actual)
+	if contains(actual, "misc:error") {
+		t.Errorf("Invalid image parsing for args contain misc:error parameter: %v", actual)
+	}
+
+	if contains(actual, "default:info") {
+		t.Errorf("Invalid image parsing for args contain default:info parameter: %v", actual)
 	}
 
 }
