@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -227,6 +228,7 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 	var images []string
 
 	var imgStringsToFilter []string
+	var regexToFilter []string
 
 	//Work-around for mis-identified image parameters that include a URL
 	imgStringsToFilter = append(imgStringsToFilter, "http://")
@@ -242,6 +244,9 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 	imgStringsToFilter = append(imgStringsToFilter, ":error")
 	imgStringsToFilter = append(imgStringsToFilter, ":critical")
 	imgStringsToFilter = append(imgStringsToFilter, ":off")
+
+	// Looking for strings like 0.0.0.0:5332
+	regexToFilter = append(regexToFilter, ".*\\d*\\.\\d*:\\d")
 
 	for _, container := range containers {
 		images = append(images, container.Image)
@@ -263,6 +268,14 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 
 			for _, string := range imgStringsToFilter {
 				if strings.Contains(image, string) {
+					skiploop = true
+				}
+			}
+
+			for _, regexpPattern := range regexToFilter {
+				found, _ := regexp.MatchString(regexpPattern, image)
+
+				if found {
 					skiploop = true
 				}
 			}

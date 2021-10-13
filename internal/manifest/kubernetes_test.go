@@ -81,3 +81,24 @@ func TestGetImagesFromContainers_WithLogComponent(t *testing.T) {
 	}
 
 }
+
+func TestGetImagesFromContainers_WithIPParameter(t *testing.T) {
+	containers := []corev1.Container{
+		{
+			Image: "baseimage:v1",
+			Args: []string{
+				"--serving-address=0.0.0.0:6443",
+			},
+		},
+	}
+	actual := getImagesFromContainers(containers)
+
+	if !contains(actual, "baseimage:v1") {
+		t.Errorf("expected baseimage:v1 to exist in list of images but it did not: %v", actual)
+	}
+
+	if contains(actual, "0.0.0.0:6443") {
+		t.Errorf("Invalid image parsing for args contain an ip addresses: %v", actual)
+	}
+
+}
