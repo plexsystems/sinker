@@ -1,8 +1,8 @@
 .PHONY: build
 build:
-	@go build
+	@go build -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$$(git describe --tags --always --dirty)'"
 
-.PHONY: test
+.PHONY: test 
 test:
 	@go test -v ./... -count=1
 
