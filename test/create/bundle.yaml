@@ -6,3 +6,20 @@ spec:
   containers:
   - image: otherhost.com/some/image:v1.0.0
     name: test-create
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: test-cronjob
+spec:
+  schedule: '*/1 * * * *'
+  jobTemplate:
+    metadata:
+      name: test-job
+    spec:
+      template:
+        spec:
+          containers:
+          - image: yetanotherhost.com/other/jobimage:234
+            name: test-job
+          restartPolicy: OnFailure
