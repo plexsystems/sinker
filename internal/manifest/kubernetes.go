@@ -246,7 +246,7 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 	imgStringsToFilter = append(imgStringsToFilter, ":off")
 
 	// Looking for strings like 0.0.0.0:5332
-	regexToFilter = append(regexToFilter, ".*\\d*:\\d")
+	regexToFilter = append(regexToFilter, ".*\\d*\\.\\d*:\\d")
 
 	for _, container := range containers {
 		images = append(images, container.Image)
