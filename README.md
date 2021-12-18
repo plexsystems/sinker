@@ -13,7 +13,7 @@ See the [example](https://github.com/plexsystems/sinker/tree/main/example) folde
 
 ## Installation
 
-`GO111MODULE=on go get github.com/plexsystems/sinker`
+`go install github.com/plexsystems/sinker@latest`
 
 Releases are also provided in the [releases](https://github.com/plexsystems/sinker/releases) tab on GitHub.
 
