@@ -250,26 +250,27 @@ func getCronJobImages(resource []byte) ([]string, error) {
 func getImagesFromContainers(containers []corev1.Container) []string {
 	var images []string
 
-	var imgStringsToFilter []string
-	var regexToFilter []string
+	imgStringsToFilter := []string{
+		// Ignore token characters.
+		"$",
 
-	//Work-around for mis-identified image parameters that include a URL
-	imgStringsToFilter = append(imgStringsToFilter, "http://")
-	imgStringsToFilter = append(imgStringsToFilter, "https://")
+		// Ignore image parameters that include a URL.
+		"http://",
+		"https://",
 
-	//Work around for Envoy/Istio log parameters (https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy.html#debugging-envoy)
-	// Too many componetns, so just targetting log levels.  Should be low instance of collusion between these values and actual image tags
-
-	imgStringsToFilter = append(imgStringsToFilter, ":trace")
-	imgStringsToFilter = append(imgStringsToFilter, ":debug")
-	imgStringsToFilter = append(imgStringsToFilter, ":info")
-	imgStringsToFilter = append(imgStringsToFilter, ":warn")
-	imgStringsToFilter = append(imgStringsToFilter, ":error")
-	imgStringsToFilter = append(imgStringsToFilter, ":critical")
-	imgStringsToFilter = append(imgStringsToFilter, ":off")
+		// Ignore Envoy/Istio log parameters
+		// (https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy.html#debugging-envoy)
+		":trace",
+		":debug",
+		":info",
+		":warn",
+		":error",
+		":critical",
+		":off",
+	}
 
 	// Looking for strings like 0.0.0.0:5332
-	regexToFilter = append(regexToFilter, ".*\\d*\\.\\d*:\\d")
+	regexToFilter := []string{".*\\d*\\.\\d*:\\d"}
 
 	for _, container := range containers {
 		images = append(images, container.Image)
@@ -289,8 +290,8 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 			// Filter out specific strings that are mis-interpreted as container images
 			var skiploop bool = false
 
-			for _, string := range imgStringsToFilter {
-				if strings.Contains(image, string) {
+			for _, imgString := range imgStringsToFilter {
+				if strings.Contains(image, imgString) {
 					skiploop = true
 				}
 			}
