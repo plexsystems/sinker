@@ -1,9 +1,0 @@
-target:
-  host: myregistry.nu
-sources:
-- repository: some/image
-  host: otherhost.com
-  tag: v1.0.0
-- repository: other/jobimage
-  host: yetanotherhost.com
-  tag: "234"
