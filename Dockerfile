@@ -1,4 +1,4 @@
-FROM golang:1.15.0 AS builder
+FROM golang:1.17 AS builder
 
 ENV CGO_ENABLED=0
 
@@ -9,7 +9,7 @@ COPY . /build
 ARG SINKER_VERSION=0.0.0
 RUN go build -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=${SINKER_VERSION}'"
 
-FROM alpine:3.12.0
+FROM alpine:3.14.3
 
 RUN apk update && apk add --no-cache docker-cli
 
