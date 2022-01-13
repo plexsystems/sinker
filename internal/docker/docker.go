@@ -177,13 +177,15 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 
 	if _, err := remote.Get(reference, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
 
-		// If the error is a transport error, check that the error code is of type
-		// MANIFEST_UNKNOWN or NOT_FOUND. These errors are expected if an image does
-		// not exist in the registry.
+		// If the error is a transport error, check if the error code is a known type (such as a missing image).
 		if t, exists := err.(*transport.Error); exists {
 			for _, diagnostic := range t.Errors {
 				if strings.EqualFold("MANIFEST_UNKNOWN", string(diagnostic.Code)) {
 					return false, nil
+				}
+
+				if strings.EqualFold("UNAUTHORIZED", string(diagnostic.Code)) {
+					return false, fmt.Errorf("Repository '%v' may not exist or authentication is required", image)
 				}
 
 				if strings.EqualFold("NOT_FOUND", string(diagnostic.Code)) {
@@ -222,7 +224,6 @@ type statusLine struct {
 }
 
 func (c Client) waitForScannerComplete(clientScanner *bufio.Scanner, image string, command string) error {
-
 	// Read the output of the Docker client until there is nothing left to read.
 	// When there is nothing left to read, the underlying operation can be considered complete.
 	var scans int
@@ -295,7 +296,6 @@ func (c Client) tryPushAndWait(ctx context.Context, image string, auth string) e
 }
 
 func imageExists(image string, images []string) bool {
-
 	// When an image is sourced from docker hub, the image tag does
 	// not include docker.io (or library) on the local machine.
 	image = strings.ReplaceAll(image, "docker.io/library/", "")

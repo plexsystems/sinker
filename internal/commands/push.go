@@ -106,12 +106,23 @@ func runPushCommand(manifestPath string) error {
 		}
 
 		if !sourceExists {
+			// When the image does not exist at the remote registry, we do not need to attempt to
+			// pull the remote exist.
+			exists, err := client.ImageExistsAtRemote(ctx, source.Image())
+			if err != nil {
+				return fmt.Errorf("image exists at remote: %w", err)
+			}
+			if !exists {
+				continue
+			}
+
 			log.Infof("Pulling %s", source.Image())
 
 			sourceAuth, err := source.EncodedAuth()
 			if err != nil {
 				return fmt.Errorf("get source auth: %w", err)
 			}
+
 			if err := client.PullAndWait(ctx, source.Image(), sourceAuth); err != nil {
 				return fmt.Errorf("pull image and wait: %w", err)
 			}
