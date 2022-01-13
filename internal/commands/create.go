@@ -15,27 +15,23 @@ func newCreateCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "create <source>",
 		Short: "Create a new a manifest",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			flags := []string{"output", "target"}
+			for _, flag := range flags {
+				if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
+					return fmt.Errorf("bind flag: %w", err)
+				}
+			}
 
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
-				return fmt.Errorf("bind target flag: %w", err)
-			}
-
-			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
-				return fmt.Errorf("bind output flag: %w", err)
-			}
-
 			var path string
 			if len(args) > 0 {
 				path = args[0]
 			}
 
-			manifestPath := viper.GetString("manifest")
-			if manifestPath == "" {
-				manifestPath = viper.GetString("output")
-			}
-
-			if err := runCreateCommand(path, manifestPath); err != nil {
+			if err := runCreateCommand(path); err != nil {
 				return fmt.Errorf("create: %w", err)
 			}
 
@@ -51,7 +47,12 @@ func newCreateCommand() *cobra.Command {
 	return &cmd
 }
 
-func runCreateCommand(path string, manifestPath string) error {
+func runCreateCommand(path string) error {
+	manifestPath := viper.GetString("manifest")
+	if manifestPath == "" {
+		manifestPath = viper.GetString("output")
+	}
+
 	if _, err := manifest.Get(manifestPath); err == nil {
 		return errors.New("manifest file already exists")
 	}

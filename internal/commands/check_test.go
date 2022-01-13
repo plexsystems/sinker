@@ -31,10 +31,7 @@ func TestNewerVersions(t *testing.T) {
 
 	foundTags := []string{"v1.0.0", "v2.0.0", "v3.0.0", "v4.0.0", "v5.0.0", "v6.0.0"}
 
-	actual, err := getNewerVersions(currentTag, foundTags)
-	if err != nil {
-		t.Fatal("get newer versions:", err)
-	}
+	actual := getNewerVersions(currentTag, foundTags)
 
 	expected := []string{"...", "v2.0.0", "v3.0.0", "v4.0.0", "v5.0.0", "v6.0.0"}
 

@@ -14,12 +14,14 @@ func newUpdateCommand() *cobra.Command {
 		Use:   "update <source>",
 		Short: "Update an existing manifest",
 		Args:  cobra.ExactArgs(1),
-
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			outputPath := viper.GetString("manifest")
 			if viper.GetString("output") != "" {
 				outputPath = viper.GetString("output")

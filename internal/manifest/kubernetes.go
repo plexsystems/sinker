@@ -37,9 +37,17 @@ func GetImagesFromKubernetesManifests(path string) ([]string, error) {
 // GetImagesFromKubernetesResources returns all images found in Kubernetes resources that have
 // already been read from the disk, or are being read from standard input.
 func GetImagesFromKubernetesResources(resources []string) ([]string, error) {
-	splitResources, err := splitResources(resources)
-	if err != nil {
-		return nil, fmt.Errorf("split resources: %w", err)
+	var splitResources []string
+	for _, resourceContents := range resources {
+		var lineBreak string
+		if strings.Contains(resourceContents, "\r\n") && runtime.GOOS == "windows" {
+			lineBreak = "\r\n"
+		} else {
+			lineBreak = "\n"
+		}
+
+		individualResources := strings.Split(resourceContents, lineBreak+"---"+lineBreak)
+		splitResources = append(splitResources, individualResources...)
 	}
 
 	var imageList []string
@@ -94,23 +102,6 @@ func getResourceContentsFromYamlFiles(path string) ([]string, error) {
 	}
 
 	return fileContents, nil
-}
-
-func splitResources(resources []string) ([]string, error) {
-	var splitResources []string
-	for _, resourceContents := range resources {
-		var lineBreak string
-		if strings.Contains(resourceContents, "\r\n") && runtime.GOOS == "windows" {
-			lineBreak = "\r\n"
-		} else {
-			lineBreak = "\n"
-		}
-
-		individualResources := strings.Split(resourceContents, lineBreak+"---"+lineBreak)
-		splitResources = append(splitResources, individualResources...)
-	}
-
-	return splitResources, nil
 }
 
 func getImagesFromResource(resource string) ([]string, error) {
@@ -287,9 +278,7 @@ func getImagesFromContainers(containers []corev1.Container) []string {
 				continue
 			}
 
-			// Filter out specific strings that are mis-interpreted as container images
-			var skiploop bool = false
-
+			var skiploop bool
 			for _, imgString := range imgStringsToFilter {
 				if strings.Contains(image, imgString) {
 					skiploop = true

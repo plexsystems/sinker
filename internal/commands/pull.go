@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/plexsystems/sinker/internal/docker"
@@ -19,19 +20,20 @@ func newPullCommand() *cobra.Command {
 		Short:     "Pull the images in the manifest",
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: []string{"source", "target"},
-
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
 				return fmt.Errorf("bind images flag: %w", err)
 			}
 
-			var origin string
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			origin := "source"
 			if len(args) > 0 {
 				origin = args[0]
 			}
 
-			manifestPath := viper.GetString("manifest")
-			if err := runPullCommand(origin, manifestPath); err != nil {
+			if err := runPullCommand(origin); err != nil {
 				return fmt.Errorf("pull: %w", err)
 			}
 
@@ -44,7 +46,9 @@ func newPullCommand() *cobra.Command {
 	return &cmd
 }
 
-func runPullCommand(origin string, manifestPath string) error {
+func runPullCommand(origin string) error {
+	manifestPath := viper.GetString("manifest")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -63,13 +67,13 @@ func runPullCommand(origin string, manifestPath string) error {
 		return fmt.Errorf("get images: %w", err)
 	}
 
-	log.Infof("Finding images that need to be pulled ...")
+	log.Infof("Finding images that need to be pulled from %v registry ...", origin)
 
 	imagesToPull := make(map[string]string)
 	for image, auth := range images {
 		exists, err := client.ImageExistsOnHost(ctx, image)
 		if err != nil {
-			return fmt.Errorf("image host existance: %w", err)
+			return fmt.Errorf("image host existence: %w", err)
 		}
 
 		if !exists {
@@ -88,6 +92,7 @@ func runPullCommand(origin string, manifestPath string) error {
 
 	for image, auth := range imagesToPull {
 		log.Infof("Pulling %s", image)
+
 		if err := client.PullAndWait(ctx, image, auth); err != nil {
 			log.Errorf("pull image and wait: " + err.Error())
 		}
@@ -110,7 +115,7 @@ func getImagesFromManifest(path string, origin string) (map[string]string, error
 		var auth string
 
 		var err error
-		if origin == "target" {
+		if strings.EqualFold(origin, "target") {
 			image = source.TargetImage()
 			auth, err = source.Target.EncodedAuth()
 		} else {
