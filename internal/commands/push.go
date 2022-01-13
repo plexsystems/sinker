@@ -18,26 +18,22 @@ func newPushCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "push",
 		Short: "Push the images in the manifest to the target repository",
-
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("dryrun", cmd.Flags().Lookup("dryrun")); err != nil {
-				return fmt.Errorf("bind dryrun flag: %w", err)
-			}
-
-			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
-				return fmt.Errorf("bind images flag: %w", err)
-			}
-
-			if err := viper.BindPFlag("target", cmd.Flags().Lookup("target")); err != nil {
-				return fmt.Errorf("bind target flag: %w", err)
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			flags := []string{"dryrun", "images", "target"}
+			for _, flag := range flags {
+				if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
+					return fmt.Errorf("bind flag: %w", err)
+				}
 			}
 
 			if len(viper.GetStringSlice("images")) > 0 && viper.GetString("target") == "" {
 				return errors.New("target must be specified when using the images flag")
 			}
 
-			manifestPath := viper.GetString("manifest")
-			if err := runPushCommand(manifestPath); err != nil {
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := runPushCommand(); err != nil {
 				return fmt.Errorf("push: %w", err)
 			}
 
@@ -52,7 +48,7 @@ func newPushCommand() *cobra.Command {
 	return &cmd
 }
 
-func runPushCommand(manifestPath string) error {
+func runPushCommand() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 

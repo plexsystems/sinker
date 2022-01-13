@@ -3,4 +3,3 @@ target:
 sources:
 - repository: busybox
   tag: latest
-  

@@ -8,10 +8,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	// sinkerVersion is set at build time.
-	sinkerVersion = ""
-)
+// sinkerVersion is set at build time.
+var sinkerVersion = "not set"
 
 // NewDefaultCommand creates the default command.
 func NewDefaultCommand() *cobra.Command {

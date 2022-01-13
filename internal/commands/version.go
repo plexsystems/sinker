@@ -8,24 +8,13 @@ import (
 
 func newVersionCommand() *cobra.Command {
 	cmd := cobra.Command{
-		Use:       "version",
-		Short:     "The version of sinker",
+		Use:   "version",
+		Short: "The version of sinker",
 
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runVersionCommand(); err != nil {
-				return fmt.Errorf("list: %w", err)
-			}
-
-			return nil
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("sinker version %v\n", sinkerVersion)
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "", "Output the images in the manifest to a file")
-
 	return &cmd
-}
-
-func runVersionCommand() error {
-	fmt.Println("sinker version " + sinkerVersion)
-	return nil
 }

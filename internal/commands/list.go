@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/plexsystems/sinker/internal/manifest"
 
@@ -16,15 +17,17 @@ func newListCommand() *cobra.Command {
 		Short:     "List the images found in the manifest",
 		Args:      cobra.ExactValidArgs(1),
 		ValidArgs: []string{"source", "target"},
-
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
 				return fmt.Errorf("bind output flag: %w", err)
 			}
 
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			origin := args[0]
-			manifestPath := viper.GetString("manifest")
-			if err := runListCommand(origin, manifestPath); err != nil {
+
+			if err := runListCommand(origin); err != nil {
 				return fmt.Errorf("list: %w", err)
 			}
 
@@ -37,7 +40,9 @@ func newListCommand() *cobra.Command {
 	return &cmd
 }
 
-func runListCommand(origin string, manifestPath string) error {
+func runListCommand(origin string) error {
+	manifestPath := viper.GetString("manifest")
+
 	imageManifest, err := manifest.Get(manifestPath)
 	if err != nil {
 		return fmt.Errorf("get manifest: %w", err)
@@ -45,33 +50,35 @@ func runListCommand(origin string, manifestPath string) error {
 
 	var images []string
 	for _, source := range imageManifest.Sources {
-		if origin == "target" {
+		if strings.EqualFold(origin, "target") {
 			images = append(images, source.TargetImage())
 		} else {
 			images = append(images, source.Image())
 		}
 	}
 
+	// When the output flag is not provided, print the images to the console.
 	if viper.GetString("output") == "" {
 		for _, image := range images {
 			fmt.Println(image)
 		}
+
 		return nil
 	}
 
-	f, err := os.Create(viper.GetString("output"))
+	fileList, err := os.Create(viper.GetString("output"))
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
-	defer f.Close()
+	defer fileList.Close()
 
 	for _, value := range images {
-		if _, err := fmt.Fprintln(f, value); err != nil {
+		if _, err := fmt.Fprintln(fileList, value); err != nil {
 			return fmt.Errorf("writing image to file: %w", err)
 		}
 	}
 
-	if err := f.Close(); err != nil {
+	if err := fileList.Close(); err != nil {
 		return fmt.Errorf("close: %w", err)
 	}
 

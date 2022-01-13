@@ -283,9 +283,9 @@ func GetImagesFromStandardInput() ([]string, error) {
 
 	var images []string
 	if strings.Contains(contents, " ") {
-		images = strings.Split(string(contents), " ")
+		images = strings.Split(contents, " ")
 	} else if strings.Contains(contents, "\n") {
-		images = strings.Split(string(contents), "\n")
+		images = strings.Split(contents, "\n")
 	}
 
 	images = dedupeImages(images)
@@ -361,7 +361,6 @@ func getEncodedBasicAuth(username string, password string) (string, error) {
 }
 
 func hostSupportsNestedRepositories(host string) bool {
-
 	// Quay.io
 	if strings.Contains(host, "quay.io") {
 		return false

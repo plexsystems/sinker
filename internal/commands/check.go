@@ -19,15 +19,17 @@ func newCheckCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "check",
 		Short: "Check for newer images",
-
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlag("images", cmd.Flags().Lookup("images")); err != nil {
 				return fmt.Errorf("bind images flag: %w", err)
 			}
 
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			var input string
 			if len(args) > 0 {
-				input = "-"
+				input = args[0]
 			}
 
 			if err := runCheckCommand(input); err != nil {
@@ -93,11 +95,7 @@ func runCheckCommand(input string) error {
 		}
 		tags = filterTags(tags)
 
-		newerVersions, err := getNewerVersions(imageVersion, tags)
-		if err != nil {
-			return fmt.Errorf("get newer versions: %w", err)
-		}
-
+		newerVersions := getNewerVersions(imageVersion, tags)
 		if len(newerVersions) == 0 {
 			log.Infof("Image %s is up to date!", image)
 			continue
@@ -109,7 +107,7 @@ func runCheckCommand(input string) error {
 	return nil
 }
 
-func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]string, error) {
+func getNewerVersions(currentVersion *version.Version, foundTags []string) []string {
 	var newerVersions []string
 	for _, foundTag := range foundTags {
 		tag, err := version.NewVersion(foundTag)
@@ -129,7 +127,7 @@ func getNewerVersions(currentVersion *version.Version, foundTags []string) ([]st
 		newerVersions = append([]string{"..."}, newerVersions...)
 	}
 
-	return newerVersions, nil
+	return newerVersions
 }
 
 func filterTags(tags []string) []string {
