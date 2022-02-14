@@ -366,10 +366,10 @@ func hostSupportsNestedRepositories(host string) bool {
 		return false
 	}
 
-        // GHCR.io
-        if strings.Contains(host, "ghcr.io") {
-                return false
-        }
+	// GHCR.io
+	if strings.Contains(host, "ghcr.io") {
+		return false
+	}
 
 	// Docker Registry (Docker Hub)
 	// An empty host is assumed to be Docker Hub.

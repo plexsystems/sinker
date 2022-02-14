@@ -74,7 +74,7 @@ If the `target` registry does _not_ support nested paths, only the base path of 
 mycompany.com/myteam/prometheus-operator:v0.40.0
 ```
 
-**Registries that do not support nested paths:** Docker Hub, Quay.io
+**Registries that do not support nested paths:** Docker Hub, GitHub Container Registry, Quay.io
 
 ## Usage
 
