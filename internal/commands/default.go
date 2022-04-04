@@ -31,6 +31,7 @@ func NewDefaultCommand() *cobra.Command {
 	cmd.AddCommand(newListCommand())
 	cmd.AddCommand(newPullCommand())
 	cmd.AddCommand(newPushCommand())
+	cmd.AddCommand(newCopyCommand())
 	cmd.AddCommand(newCheckCommand())
 	cmd.AddCommand(newVersionCommand())
 
