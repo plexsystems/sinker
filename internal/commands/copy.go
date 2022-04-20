@@ -20,7 +20,7 @@ import (
 func newCopyCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "copy",
-		Short: "Copy the images in the manifest to the target repository",
+		Short: "Copy the images in the manifest directly from source to target repository",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			flags := []string{"dryrun", "images", "target", "force", "override-arch", "override-os", "all-variants"}
 			for _, flag := range flags {
@@ -98,15 +98,14 @@ func runCopyCommand() error {
 
 	if viper.GetBool("dryrun") {
 		for _, source := range sourcesToCopy {
-			log.Infof("Image %s would be copied as %s", source.Image(), source.TargetImage())
+			log.Infof("Image %s would be copied to %s", source.Image(), source.TargetImage())
 		}
 		return nil
 	}
 
 	// Create a default image policy accepting unsigned images
-	policy, err := signature.DefaultPolicy(nil)
-	policy = &signature.Policy{Default: []signature.PolicyRequirement{signature.NewPRInsecureAcceptAnything()}}
-	policyContext, err := signature.NewPolicyContext(policy)
+	policy := &signature.Policy{Default: []signature.PolicyRequirement{signature.NewPRInsecureAcceptAnything()}}
+	policyContext, _ := signature.NewPolicyContext(policy)
 
 	imageTransport := dockerv5.Transport
 
@@ -118,7 +117,6 @@ func runCopyCommand() error {
 	}
 
 	if viper.GetString("override-os") != "" || viper.GetString("override-arch") != "" {
-		// copyOptions.ImageListSelection = copy.CopySpecificImages
 		copyOptions.SourceCtx = &types.SystemContext{
 			ArchitectureChoice: viper.GetString("override-arch"),
 			OSChoice:           viper.GetString("override-os"),
@@ -127,9 +125,15 @@ func runCopyCommand() error {
 	for _, source := range sourcesToCopy {
 		log.Infof("Copying image %s to %s", source.Image(), source.TargetImage())
 		destRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.TargetImage()))
-		srcRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.Image()))
+		if err != nil {
+			return fmt.Errorf("Error parsing target image reference: %w", err)
+		}
 
-		//_, err
+		srcRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.Image()))
+		if err != nil {
+			return fmt.Errorf("Error parsing source image reference: %w", err)
+		}
+
 		manifest, err := copy.Image(ctx, policyContext, destRef, srcRef, copyOptions)
 
 		if err != nil {
