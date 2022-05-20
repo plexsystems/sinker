@@ -35,6 +35,7 @@ func newCopyCommand() *cobra.Command {
 
 			return nil
 		},
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := runCopyCommand(); err != nil {
 				return fmt.Errorf("copy: %w", err)
@@ -59,7 +60,7 @@ func runCopyCommand() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	// Use docker client for queries that do not require access to docker socket
+	// Use Docker client for queries that do not require access to docker socket.
 	client, err := docker.New(log.Infof)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
@@ -100,16 +101,22 @@ func runCopyCommand() error {
 		for _, source := range sourcesToCopy {
 			log.Infof("Image %s would be copied to %s", source.Image(), source.TargetImage())
 		}
+
 		return nil
 	}
 
-	// Create a default image policy accepting unsigned images
-	policy := &signature.Policy{Default: []signature.PolicyRequirement{signature.NewPRInsecureAcceptAnything()}}
-	policyContext, _ := signature.NewPolicyContext(policy)
+	// Create a default image policy accepting unsigned images.
+	policy := &signature.Policy{
+		Default: []signature.PolicyRequirement{
+			signature.NewPRInsecureAcceptAnything(),
+		},
+	}
+	policyContext, err := signature.NewPolicyContext(policy)
+	if err != nil {
+		return fmt.Errorf("new policy context: %w", err)
+	}
 
-	imageTransport := dockerv5.Transport
-
-	copyOptions := &copy.Options{}
+	var copyOptions copy.Options
 	if viper.GetBool("all-variants") {
 		copyOptions.ImageListSelection = copy.CopyAllImages
 	} else {
@@ -122,6 +129,8 @@ func runCopyCommand() error {
 			OSChoice:           viper.GetString("override-os"),
 		}
 	}
+
+	imageTransport := dockerv5.Transport
 	for _, source := range sourcesToCopy {
 		log.Infof("Copying image %s to %s", source.Image(), source.TargetImage())
 		destRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.TargetImage()))
@@ -134,14 +143,11 @@ func runCopyCommand() error {
 			return fmt.Errorf("Error parsing source image reference: %w", err)
 		}
 
-		manifest, err := copy.Image(ctx, policyContext, destRef, srcRef, copyOptions)
-
-		if err != nil {
+		if _, err := copy.Image(ctx, policyContext, destRef, srcRef, &copyOptions); err != nil {
 			return fmt.Errorf("copy image: %w", err)
 		}
-		log.Debugf("Manifest copied as %s", manifest)
 	}
-	log.Infof("All images have been copied!")
 
+	log.Infof("All images have been copied!")
 	return nil
 }

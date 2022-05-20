@@ -19,8 +19,8 @@ jobs:
 
       - name: lint go
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.46.2
           ./bin/golangci-lint run --timeout=5m --color=always --max-same-issues=0 --max-issues-per-linter=0
 
       - name: unit tests
-        run: go test -tags 'containers_image_openpgp' -v ./...
+        run: make test

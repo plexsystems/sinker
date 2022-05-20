@@ -1,9 +1,10 @@
 GO_TAGS=-tags 'containers_image_openpgp'
+
 .PHONY: build
 build:
 	@go build $(GO_TAGS) -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$$(git describe --tags --always --dirty)'"
 
-.PHONY: test 
+.PHONY: test
 test:
 	@go test -v ./... -count=1
 

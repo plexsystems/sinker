@@ -11,8 +11,8 @@ import (
 
 	"github.com/plexsystems/sinker/internal/docker"
 
-	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	kubeyaml "github.com/ghodss/yaml"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
