@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: build
-        run: go build -o sinker main.go
+        run: go build -tags 'containers_image_openpgp' -o sinker main.go
 
       - name: lint go
         run: |
@@ -23,4 +23,4 @@ jobs:
           ./bin/golangci-lint run --timeout=5m --color=always --max-same-issues=0 --max-issues-per-linter=0
 
       - name: unit tests
-        run: go test -v ./...
+        run: go test -tags 'containers_image_openpgp' -v ./...
