@@ -4,11 +4,12 @@ ENV CGO_ENABLED=0
 
 WORKDIR /build
 COPY . /build
+
 # SINKER_VERSION is set during the release process
 ARG SINKER_VERSION=0.0.0
 RUN go build -tags 'containers_image_openpgp' -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=${SINKER_VERSION}'"
 
-FROM alpine:3.14.3
+FROM alpine:3.14.6
 
 RUN apk update && apk add --no-cache docker-cli
 
