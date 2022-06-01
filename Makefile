@@ -6,7 +6,7 @@ build:
 
 .PHONY: test
 test:
-	@go test -v ./... -count=1
+	@go test -tags='$(GO_TAGS)' -v ./... -count=1
 
 .PHONY: lint
 lint:
