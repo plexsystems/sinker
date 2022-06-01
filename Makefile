@@ -25,6 +25,6 @@ all: build test acceptance
 release:
 	@test $(version)
 	@docker build --build-arg SINKER_VERSION=$(version) -t plexsystems/sinker:$(version) .
-	@GOOS=darwin GOARCH=amd64 go build $(GO_TAGS) -o sinker-darwin-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
-	@GOOS=windows GOARCH=amd64 go build $(GO_TAGS) -o sinker-windows-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
-	@GOOS=linux GOARCH=amd64 go build $(GO_TAGS) -o sinker-linux-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
+	@GOOS=darwin GOARCH=amd64 go build -tags='$(GO_TAGS)' -o sinker-darwin-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
+	@GOOS=windows GOARCH=amd64 go build -tags='$(GO_TAGS)' -o sinker-windows-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
+	@GOOS=linux GOARCH=amd64 go build -tags='$(GO_TAGS)' -o sinker-linux-amd64 -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$(version)'"
