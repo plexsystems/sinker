@@ -1,15 +1,16 @@
-GO_TAGS=-tags 'containers_image_openpgp'
+GO_TAGS=containers_image_openpgp
+
 .PHONY: build
 build:
-	@go build $(GO_TAGS) -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$$(git describe --tags --always --dirty)'"
+	@go build -tags='$(GO_TAGS)' -ldflags="-X 'github.com/plexsystems/sinker/internal/commands.sinkerVersion=$$(git describe --tags --always --dirty)'"
 
-.PHONY: test 
+.PHONY: test
 test:
-	@go test -v ./... -count=1
+	@go test -tags='$(GO_TAGS)' -v ./... -count=1
 
 .PHONY: lint
 lint:
-	@golangci-lint run --fix
+	@golangci-lint --build-tags='$(GO_TAGS)' run --fix
 
 .PHONY: acceptance
 acceptance: build

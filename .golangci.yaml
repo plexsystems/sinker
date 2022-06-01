@@ -17,7 +17,6 @@ linters:
     - misspell
     - predeclared
     - revive
-    - staticcheck
     - structcheck
     - typecheck
     - unconvert
