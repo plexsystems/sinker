@@ -296,7 +296,7 @@ func TestManifest_Update(t *testing.T) {
 		input            []string
 		expected         Manifest
 	}{
-		/*{
+		{
 			desc:             "replaces tags with latest version without repository",
 			input:            []string{"mycr.com/foo/bar:1.2.3"},
 			existingManifest: base,
@@ -331,7 +331,7 @@ func TestManifest_Update(t *testing.T) {
 					},
 				},
 			},
-		},*/
+		},
 		{
 			desc:  "preserves source specific host overrides from manifest",
 			input: []string{"myothercr.com/foo/bar:1.2.3"},
@@ -370,7 +370,7 @@ func TestManifest_Update(t *testing.T) {
 				},
 				Sources: []Source{
 					{
-						Repository: "foo/bar",
+						Repository: "bar",
 						Tag:        "1.0.0",
 						Target: Target{
 							Host:       "mycr.com",
@@ -403,7 +403,7 @@ func TestManifest_Update(t *testing.T) {
 				},
 				Sources: []Source{
 					{
-						Repository: "foo/bar",
+						Repository: "bar",
 						Tag:        "1.0.0",
 						Target: Target{
 							Host:       "mycr.com",
@@ -419,7 +419,7 @@ func TestManifest_Update(t *testing.T) {
 				},
 				Sources: []Source{
 					{
-						Repository: "foo/bar",
+						Repository: "bar",
 						Tag:        "1.2.3",
 						Target: Target{
 							Host:       "mycr.com",
