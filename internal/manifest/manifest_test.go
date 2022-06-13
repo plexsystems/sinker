@@ -3,6 +3,7 @@ package manifest
 import (
 	"encoding/base64"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -278,5 +279,164 @@ func TestSource_TargetDoesNotSupportNestedRepositories_MultiplePaths(t *testing.
 	const expectedTarget = "targetrepo/sourcerepo:v1.0.0"
 	if source.TargetImage() != expectedTarget {
 		t.Errorf("unexpected target string. expected %s, actual %s", expectedTarget, source.TargetImage())
+	}
+}
+
+func TestManifest_Update(t *testing.T) {
+	base := Manifest{
+		Target: Target{
+			Host:       "mycr.com",
+			Repository: "",
+		},
+	}
+
+	testCases := []struct {
+		desc             string
+		existingManifest Manifest
+		input            []string
+		expected         Manifest
+	}{
+		{
+			desc:             "replaces tags with latest version without repository",
+			input:            []string{"mycr.com/foo/bar:1.2.3"},
+			existingManifest: base,
+			expected: Manifest{
+				Target: base.Target,
+				Sources: []Source{
+					{
+						Repository: "foo/bar",
+						Tag:        "1.2.3",
+					},
+				},
+			},
+		},
+		{
+			desc:  "replaces tags with latest version with repository",
+			input: []string{"mycr.com/foo/bar:1.2.3"},
+			existingManifest: Manifest{
+				Target: Target{
+					Host:       base.Target.Host,
+					Repository: "foo",
+				},
+			},
+			expected: Manifest{
+				Target: Target{
+					Host:       "mycr.com",
+					Repository: "foo",
+				},
+				Sources: []Source{
+					{
+						Repository: "bar",
+						Tag:        "1.2.3",
+					},
+				},
+			},
+		},
+		{
+			desc:  "preserves source specific host overrides from manifest",
+			input: []string{"myothercr.com/foo/bar:1.2.3"},
+			existingManifest: Manifest{
+				Target: base.Target,
+				Sources: []Source{
+					{
+						Repository: "foo/bar",
+						Tag:        "1.0.0",
+						Target: Target{
+							Host: "myothercr.com",
+						},
+					},
+				},
+			},
+			expected: Manifest{
+				Target: base.Target,
+				Sources: []Source{
+					{
+						Repository: "foo/bar",
+						Tag:        "1.2.3",
+						Target: Target{
+							Host: "myothercr.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:  "omits target with matching host and repository",
+			input: []string{"mycr.com/foo/bar:1.2.3"},
+			existingManifest: Manifest{
+				Target: Target{
+					Host:       "mycr.com",
+					Repository: "foo",
+				},
+				Sources: []Source{
+					{
+						Repository: "bar",
+						Tag:        "1.0.0",
+						Target: Target{
+							Host:       "mycr.com",
+							Repository: "foo",
+						},
+					},
+				},
+			},
+			expected: Manifest{
+				Target: Target{
+					Host:       "mycr.com",
+					Repository: "foo",
+				},
+				Sources: []Source{
+					{
+						Repository: "bar",
+						Tag:        "1.2.3",
+						Target:     Target{},
+					},
+				},
+			},
+		},
+		{
+			desc:  "includes target with matching host but different repository",
+			input: []string{"mycr.com/foo/bar:1.2.3"},
+			existingManifest: Manifest{
+				Target: Target{
+					Host:       "mycr.com",
+					Repository: "",
+				},
+				Sources: []Source{
+					{
+						Repository: "bar",
+						Tag:        "1.0.0",
+						Target: Target{
+							Host:       "mycr.com",
+							Repository: "foo",
+						},
+					},
+				},
+			},
+			expected: Manifest{
+				Target: Target{
+					Host:       "mycr.com",
+					Repository: "",
+				},
+				Sources: []Source{
+					{
+						Repository: "bar",
+						Tag:        "1.2.3",
+						Target: Target{
+							Host:       "mycr.com",
+							Repository: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
+			result := testCase.existingManifest.Update(testCase.input)
+			if !reflect.DeepEqual(result, testCase.expected) {
+				t.Errorf("expected '%v' got '%v'", testCase.expected, result)
+			}
+		})
 	}
 }

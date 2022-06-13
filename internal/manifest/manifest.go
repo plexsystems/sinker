@@ -102,11 +102,9 @@ func (m Manifest) Update(images []string) Manifest {
 		//
 		// To preserve the current settings, set the manifest host and repository values
 		// to the ones present in the current manifest.
-		if foundSource.Target.Host != m.Target.Host {
-			updatedSource.Target.Host = foundSource.Target.Host
-		}
-		if foundSource.Target.Repository != m.Target.Repository {
-			updatedSource.Target.Repository = foundSource.Target.Repository
+		if foundSource.Target.Host != m.Target.Host ||
+			foundSource.Target.Repository != m.Target.Repository {
+			updatedSource.Target = foundSource.Target
 		}
 
 		updatedSources = append(updatedSources, updatedSource)
