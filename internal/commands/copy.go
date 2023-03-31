@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/containers/image/v5/copy"
 	dockerv5 "github.com/containers/image/v5/docker"
@@ -80,16 +83,30 @@ func runCopyCommand() error {
 
 	log.Infof("Finding images that need to be copied ...")
 
+	errs, errCtx := errgroup.WithContext(ctx)
+	errs.SetLimit(20)
+	var mu sync.Mutex
 	var sourcesToCopy []manifest.Source
 	for _, source := range sources {
-		exists, err := client.ImageExistsAtRemote(ctx, source.TargetImage())
-		if err != nil {
-			return fmt.Errorf("image exists at remote: %w", err)
-		}
+		source := source
+		errs.Go(func() error {
+			exists, err := client.ImageExistsAtRemote(errCtx, source.TargetImage())
+			if err != nil {
+				return fmt.Errorf("image exists at remote: %w", err)
+			}
 
-		if !exists || viper.GetBool("force") {
-			sourcesToCopy = append(sourcesToCopy, source)
-		}
+			if !exists || viper.GetBool("force") {
+				mu.Lock()
+				sourcesToCopy = append(sourcesToCopy, source)
+				mu.Unlock()
+			}
+
+			return nil
+		})
+	}
+
+	if err := errs.Wait(); err != nil {
+		return err
 	}
 
 	if len(sourcesToCopy) == 0 {
@@ -135,12 +152,12 @@ func runCopyCommand() error {
 		log.Infof("Copying image %s to %s", source.Image(), source.TargetImage())
 		destRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.TargetImage()))
 		if err != nil {
-			return fmt.Errorf("Error parsing target image reference: %w", err)
+			return fmt.Errorf("unable to parse target image reference: %w", err)
 		}
 
 		srcRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.Image()))
 		if err != nil {
-			return fmt.Errorf("Error parsing source image reference: %w", err)
+			return fmt.Errorf("unable to parse source image reference: %w", err)
 		}
 
 		if _, err := copy.Image(ctx, policyContext, destRef, srcRef, &copyOptions); err != nil {
