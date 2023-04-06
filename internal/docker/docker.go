@@ -19,8 +19,9 @@ import (
 
 // Client manages the communication with the Docker client.
 type Client struct {
-	docker  *client.Client
-	logInfo func(format string, args ...interface{})
+	docker        *client.Client
+	logInfo       func(format string, args ...interface{})
+	remoteOptions []remote.Option
 }
 
 // New returns a Docker client configured with the given information logger.
@@ -33,9 +34,21 @@ func New(logInfo func(format string, args ...interface{})) (Client, error) {
 		return Client{}, fmt.Errorf("new docker client: %w", err)
 	}
 
+	remoteOptions := []remote.Option{
+		remote.WithAuthFromKeychain(authn.DefaultKeychain),
+		remote.WithRetryBackoff(remote.Backoff{
+			Duration: 6 * time.Second,
+			Factor:   10.0,
+			Jitter:   0.1,
+			Steps:    3,
+			Cap:      1 * time.Hour,
+		}),
+	}
+
 	client := Client{
-		docker:  dockerClient,
-		logInfo: logInfo,
+		docker:        dockerClient,
+		remoteOptions: remoteOptions,
+		logInfo:       logInfo,
 	}
 
 	return client, nil
@@ -151,7 +164,7 @@ func (c Client) GetTagsForRepository(ctx context.Context, host string, repositor
 		return nil, fmt.Errorf("new repo: %w", err)
 	}
 
-	tags, err := remote.ListWithContext(ctx, repo, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	tags, err := remote.List(repo, append(c.remoteOptions, remote.WithContext(ctx))...)
 	if err != nil {
 		return nil, fmt.Errorf("list: %w", err)
 	}
@@ -175,7 +188,7 @@ func (c Client) ImageExistsAtRemote(ctx context.Context, image string) (bool, er
 		return false, fmt.Errorf("parse ref: %w", err)
 	}
 
-	if _, err := remote.Get(reference, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
+	if _, err := remote.Get(reference, append(c.remoteOptions, remote.WithContext(ctx))...); err != nil {
 
 		// If the error is a transport error, check that the error code is of type
 		// MANIFEST_UNKNOWN or NOT_FOUND. These errors are expected if an image does
