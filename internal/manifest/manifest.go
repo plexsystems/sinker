@@ -369,7 +369,7 @@ func hostSupportsNestedRepositories(host string) bool {
 		return false
 	}
 
-	// GHCR.io
+	// Registry
 	if strings.Contains(host, "registry") {
 		return false
 	}
