@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -93,7 +92,7 @@ func getResourceContentsFromYamlFiles(path string) ([]string, error) {
 
 	var fileContents []string
 	for _, filePath := range filePaths {
-		contents, err := ioutil.ReadFile(filePath)
+		contents, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("read file: %w", err)
 		}

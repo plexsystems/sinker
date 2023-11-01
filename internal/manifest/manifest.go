@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +24,7 @@ type Manifest struct {
 // Get returns the manifest found at the specified path.
 func Get(path string) (Manifest, error) {
 	manifestLocation := getManifestLocation(path)
-	manifestContents, err := ioutil.ReadFile(manifestLocation)
+	manifestContents, err := os.ReadFile(manifestLocation)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -53,7 +53,7 @@ func (m Manifest) Write(path string) error {
 	}
 
 	manifestLocation := getManifestLocation(path)
-	if err := ioutil.WriteFile(manifestLocation, imageManifestContents, os.ModePerm); err != nil {
+	if err := os.WriteFile(manifestLocation, imageManifestContents, os.ModePerm); err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
 
@@ -263,8 +263,8 @@ func GetSourcesFromImages(images []string, target string) []Source {
 
 // GetImagesFromStandardInput gets a list of images passed in by standard input.
 func GetImagesFromStandardInput() ([]string, error) {
-	standardInReader := ioutil.NopCloser(bufio.NewReader(os.Stdin))
-	byteContents, err := ioutil.ReadAll(standardInReader)
+	standardInReader := io.NopCloser(bufio.NewReader(os.Stdin))
+	byteContents, err := io.ReadAll(standardInReader)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
