@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/containers/image/v5/copy"
 	dockerv5 "github.com/containers/image/v5/docker"
@@ -22,7 +25,7 @@ func newCopyCommand() *cobra.Command {
 		Use:   "copy",
 		Short: "Copy the images in the manifest directly from source to target repository",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			flags := []string{"dryrun", "images", "target", "force", "override-arch", "override-os", "all-variants"}
+			flags := []string{"dryrun", "images", "target", "force", "override-arch", "override-os", "all-variants", "jobs"}
 			for _, flag := range flags {
 				if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
 					return fmt.Errorf("bind flag: %w", err)
@@ -52,6 +55,7 @@ func newCopyCommand() *cobra.Command {
 	cmd.Flags().StringP("override-arch", "a", "", "Architecture variant of the image if it is a multi-arch image")
 	cmd.Flags().StringP("override-os", "o", "", "Operating system variant of the image if it is a multi-os image")
 	cmd.Flags().Bool("all-variants", false, "Copy all variants of the image")
+	cmd.Flags().IntP("jobs", "j", 1, "Allow N jobs at once; if 0, unlimited. Only applied to remote calls.")
 
 	return &cmd
 }
@@ -80,16 +84,30 @@ func runCopyCommand() error {
 
 	log.Infof("Finding images that need to be copied ...")
 
+	errs, errCtx := errgroup.WithContext(ctx)
+	errs.SetLimit(viper.GetInt("jobs"))
+	var mu sync.Mutex
 	var sourcesToCopy []manifest.Source
 	for _, source := range sources {
-		exists, err := client.ImageExistsAtRemote(ctx, source.TargetImage())
-		if err != nil {
-			return fmt.Errorf("image exists at remote: %w", err)
-		}
+		source := source
+		errs.Go(func() error {
+			exists, err := client.ImageExistsAtRemote(errCtx, source.TargetImage())
+			if err != nil {
+				return fmt.Errorf("image exists at remote: %w", err)
+			}
 
-		if !exists || viper.GetBool("force") {
-			sourcesToCopy = append(sourcesToCopy, source)
-		}
+			if !exists || viper.GetBool("force") {
+				mu.Lock()
+				sourcesToCopy = append(sourcesToCopy, source)
+				mu.Unlock()
+			}
+
+			return nil
+		})
+	}
+
+	if err := errs.Wait(); err != nil {
+		return err
 	}
 
 	if len(sourcesToCopy) == 0 {
@@ -135,12 +153,12 @@ func runCopyCommand() error {
 		log.Infof("Copying image %s to %s", source.Image(), source.TargetImage())
 		destRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.TargetImage()))
 		if err != nil {
-			return fmt.Errorf("Error parsing target image reference: %w", err)
+			return fmt.Errorf("unable to parse target image reference: %w", err)
 		}
 
 		srcRef, err := imageTransport.ParseReference(fmt.Sprintf("//%s", source.Image()))
 		if err != nil {
-			return fmt.Errorf("Error parsing source image reference: %w", err)
+			return fmt.Errorf("unable to parse source image reference: %w", err)
 		}
 
 		if _, err := copy.Image(ctx, policyContext, destRef, srcRef, &copyOptions); err != nil {
